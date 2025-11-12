@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الموردين</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>🏪 الموردين</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>إضافة مورد</h3>
+      <input id="sp_name" placeholder="اسم المورد">
+      <input id="sp_phone" placeholder="الهاتف">
+      <input id="sp_addr" placeholder="العنوان">
+      <button onclick="doAddSupplier()">إضافة مورد</button>
+    </div>
+    <div class="card">
+      <h3>بيانات الموردين</h3>
+      <table id="supTable"><thead><tr><th>#</th><th>رقم</th><th>اسم</th><th>هاتف</th><th>عنوان</th><th>تحكم</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function renderSuppliers(){
+  const tbody=document.querySelector('#supTable tbody'); tbody.innerHTML=''; const arr=DB.getSuppliers();
+  arr.forEach((s,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${s.id}</td><td>${s.name}</td><td>${s.phone||''}</td><td>${s.address||''}</td>
+    <td><button onclick="editSupplier(${s.id})">تعديل</button> <button onclick="removeSupplier(${s.id})">حذف</button></td>`; tbody.appendChild(tr);});
+}
+function doAddSupplier(){ const name=document.getElementById('sp_name').value.trim(); const phone=document.getElementById('sp_phone').value.trim(); const addr=document.getElementById('sp_addr').value.trim(); if(!name) return alert('الاسم مطلوب'); App.addSupplierApp(name,phone,addr); document.getElementById('sp_name').value='';document.getElementById('sp_phone').value='';document.getElementById('sp_addr').value=''; renderSuppliers(); App.populateAllSelects();}
+function editSupplier(id){ const arr=DB.getSuppliers(); const s=arr.find(x=>x.id==id); if(!s) return; const name=prompt('الاسم',s.name); if(name===null) return; const phone=prompt('الهاتف',s.phone||''); const addr=prompt('العنوان',s.address||''); App.updateSupplierApp(id,{name,phone,address:addr}); renderSuppliers(); }
+function removeSupplier(id){ if(!confirm('حذف المورد؟')) return; App.deleteSupplierApp(id); renderSuppliers(); App.populateAllSelects(); }
+initApp().then(renderSuppliers);
+</script>
+</body>
+</html>

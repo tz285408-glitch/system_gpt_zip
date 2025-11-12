@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arafat Accounting System - الرئيسية</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="logo card">
+  <img src="assets/logo.png" alt="شعار" onerror="this.src='https://via.placeholder.com/48'">
+  <span>🏢 Arafat Accounting System</span>
+</div>
+<div class="app">
+  <div class="sidebar card">
+    <h3>القائمة</h3>
+
+    <div class="menu-section">
+      <div class="title">الأصناف</div>
+      <ul class="menu">
+        <li><a href="items.html">- إضافة صنف / بيانات الأصناف</a></li>
+      </ul>
+    </div>
+
+    <div class="menu-section">
+      <div class="title">الموردين</div>
+      <ul class="menu">
+        <li><a href="suppliers.html">- إضافة مورد / بيانات الموردين</a></li>
+      </ul>
+    </div>
+
+    <div class="menu-section">
+      <div class="title">العملاء</div>
+      <ul class="menu">
+        <li><a href="customers.html">- إضافة عميل / بيانات العملاء</a></li>
+      </ul>
+    </div>
+
+    <div class="menu-section">
+      <div class="title">الصندوق</div>
+      <ul class="menu">
+        <li><a href="treasury.html">- إضافة صندوق / بيانات الصندوق</a></li>
+      </ul>
+    </div>
+
+    <div class="menu-section">
+      <div class="title">🧾 الفواتير</div>
+      <ul class="menu">
+        <li><a href="purchases.html">- مشتريات</a></li>
+        <li><a href="purchases.html#returns">- مرتجع مشتريات</a></li>
+        <li><a href="sales.html">- مبيعات</a></li>
+        <li><a href="sales.html#returns">- مرتجع مبيعات</a></li>
+      </ul>
+    </div>
+
+    <div class="menu-section">
+      <div class="title">📊 التقارير</div>
+      <ul class="menu">
+        <li><a href="reports.html">- تقارير المشتريات / مرتجعات</a></li>
+        <li><a href="reports.html#sales">- تقارير المبيعات / مرتجعات</a></li>
+      </ul>
+    </div>
+
+    <div class="menu-section">
+      <div class="title">عمليات محاسبية</div>
+      <ul class="menu">
+        <li><a href="daily_entries.html">💰 القيود اليومية</a></li>
+        <li><a href="ledger.html">📚 دفتر الأستاذ</a></li>
+        <li><a href="balance_sheet.html">📈 الميزانية العمومية</a></li>
+        <li><a href="trading_list.html">🧮 قائمة المتاجرة</a></li>
+        <li><a href="profit_loss.html">💵 الأرباح والخسائر</a></li>
+        <li><a href="account_statement.html">📂 كشف الحساب</a></li>
+      </ul>
+    </div>
+
+    <div class="menu-section">
+      <div class="title">⚙️ إعدادات</div>
+      <ul class="menu"><li><a href="settings.html">- إعداد النظام</a></li></ul>
+    </div>
+
+  </div>
+
+  <div class="main">
+    <div class="card page-title">
+      <div>
+        <h2>مرحباً بك في Arafat Accounting System</h2>
+        <p class="small">اختر من القائمة اليسرى لفتح أي قسم. الواجهة متطورة وتدعم حفظ البيانات محلياً (LocalStorage).</p>
+      </div>
+      <div class="controls">
+        <button onclick="window.location.href='items.html'">إدارة الأصناف</button>
+        <button onclick="window.location.href='purchases.html'">فاتورة مشتريات</button>
+        <button onclick="window.location.href='sales.html'">فاتورة مبيعات</button>
+        <button onclick="window.location.href='reports.html'">عرض التقارير</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>حالة سريعة</h3>
+      <div class="row">
+        <div class="small">عدد الأصناف: <span id="quickItems">0</span></div>
+        <div class="small">عدد الموردين: <span id="quickSuppliers">0</span></div>
+        <div class="small">عدد العملاء: <span id="quickCustomers">0</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+/* quick counts */
+function quickCounts(){
+  document.getElementById('quickItems').textContent = DB.getItems().length;
+  document.getElementById('quickSuppliers').textContent = DB.getSuppliers().length;
+  document.getElementById('quickCustomers').textContent = DB.getCustomers().length;
+}
+initApp().then(quickCounts);
+</script>
+</body>
+</html>

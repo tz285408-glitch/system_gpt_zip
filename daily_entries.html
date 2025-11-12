@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>القيود اليومية</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>🧾 القيود اليومية</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>إدخال قيد جديد</h3>
+      <textarea id="journalLines" placeholder="سطر واحد لكل قيد: منAccount|toAccount|amount (مثال: صندوق|مورد_1|1000)" style="width:100%;height:90px"></textarea>
+      <input id="journalDesc" placeholder="وصف القيد">
+      <button onclick="saveJournalUI()">حفظ القيد</button>
+    </div>
+
+    <div class="card">
+      <h3>القيود المحفوظة</h3>
+      <table id="journalTable"><thead><tr><th>#</th><th>التاريخ</th><th>الوصف</th><th>التفاصيل</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function saveJournalUI(){
+  const raw=document.getElementById('journalLines').value.trim(); if(!raw) return alert('ادخل القيود');
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean).map(s=>{
+    const parts=s.split('|').map(x=>x.trim());
+    return {fromAccount:parts[0]||'', toAccount:parts[1]||'', amount:Number(parts[2]||0)};
+  });
+  const desc=document.getElementById('journalDesc').value.trim();
+  const res=App.saveJournalEntry({entries:lines, description:desc});
+  if(res.ok){ alert('تم حفظ القيد'); document.getElementById('journalLines').value=''; document.getElementById('journalDesc').value=''; renderJournalTable(); } else alert(res.msg||'خطأ');
+}
+function renderJournalTable(){
+  const tbody=document.querySelector('#journalTable tbody'); tbody.innerHTML=''; const arr=DB.getJournal();
+  arr.forEach((j,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${j.date} ${j.time}</td><td>${j.description||''}</td><td>${j.entries.map(e=>`${e.fromAccount}->${e.toAccount} : ${e.amount}`).join('<br>')}</td>`; tbody.appendChild(tr); });
+}
+initApp().then(renderJournalTable);
+</script>
+</body>
+</html>

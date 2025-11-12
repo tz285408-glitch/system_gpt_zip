@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الصندوق</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>💰 الصناديق</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>إضافة صندوق</h3>
+      <input id="tr_name" placeholder="اسم الصندوق">
+      <select id="tr_type"><option value="cash">صندوق نقدي</option><option value="bank">حساب بنكي</option></select>
+      <button onclick="doAddTreasury()">إضافة</button>
+    </div>
+    <div class="card">
+      <h3>بيانات الصناديق</h3>
+      <table id="trTable"><thead><tr><th>#</th><th>رقم</th><th>الاسم</th><th>النوع</th><th>الرصيد</th><th>تحكم</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function renderTreasury(){
+  const tbody=document.querySelector('#trTable tbody'); tbody.innerHTML=''; const arr=DB.getTreasury();
+  arr.forEach((t,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${t.id}</td><td>${t.name}</td><td>${t.type}</td><td>${Number(t.balance||0).toFixed(2)}</td><td><button onclick="editTreasury(${t.id})">تعديل</button></td>`; tbody.appendChild(tr); });
+}
+function doAddTreasury(){ const n=document.getElementById('tr_name').value.trim(); const type=document.getElementById('tr_type').value; if(!n) return alert('الاسم مطلوب'); App.addTreasuryApp(n,type); document.getElementById('tr_name').value=''; renderTreasury(); App.populateAllSelects(); }
+function editTreasury(id){ const arr=DB.getTreasury(); const t=arr.find(x=>x.id==id); if(!t) return; const name=prompt('الاسم',t.name); if(name===null) return; App.updateTreasuryApp(id,{name}); renderTreasury(); }
+initApp().then(renderTreasury);
+</script>
+</body>
+</html>

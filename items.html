@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الأصناف</title>
+<link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>🏷 إدارة الأصناف</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>إضافة صنف</h3>
+      <div class="controls">
+        <input id="it_name" placeholder="اسم الصنف">
+        <input id="it_unit" placeholder="الوحدة">
+        <input id="it_buy" type="number" placeholder="سعر الشراء">
+        <input id="it_sell" type="number" placeholder="سعر البيع">
+        <button onclick="doAddItem()">إضافة</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>بيانات الأصناف</h3>
+      <table id="itemsTable"><thead><tr><th>#</th><th>رقم</th><th>الاسم</th><th>الوحدة</th><th>سعر الشراء</th><th>سعر البيع</th><th>تحكم</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function renderItemsPage(){
+  const tbody=document.querySelector('#itemsTable tbody'); tbody.innerHTML='';
+  const items = DB.getItems();
+  items.forEach((it,idx)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${idx+1}</td><td>${it.id}</td><td>${it.name}</td><td>${it.unit}</td><td>${Number(it.buy||0).toFixed(2)}</td><td>${Number(it.sell||0).toFixed(2)}</td>
+      <td class="actions">
+        <button onclick="editItem(${it.id})">تعديل</button>
+        <button onclick="removeItem(${it.id})">حذف</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+function doAddItem(){
+  const n=document.getElementById('it_name').value.trim();
+  const u=document.getElementById('it_unit').value.trim();
+  const b=document.getElementById('it_buy').value;
+  const s=document.getElementById('it_sell').value;
+  const r=App.addItemApp(n,u,b,s);
+  if(r.ok){ alert('تم إضافة الصنف'); document.getElementById('it_name').value='';document.getElementById('it_unit').value='';document.getElementById('it_buy').value='';document.getElementById('it_sell').value=''; renderItemsPage(); App.populateAllSelects(); }
+  else alert(r.msg||'خطأ');
+}
+function editItem(id){
+  const items=DB.getItems(); const it=items.find(x=>x.id==id); if(!it) return alert('غير موجود');
+  const name=prompt('الاسم',it.name); if(name===null) return;
+  const unit=prompt('الوحدة',it.unit); const buy=prompt('سعر الشراء',it.buy||0); const sell=prompt('سعر البيع',it.sell||0);
+  App.updateItemApp(id,{name,unit,buy:Number(buy||0),sell:Number(sell||0)}); renderItemsPage(); App.populateAllSelects();
+}
+function removeItem(id){ if(!confirm('حذف الصنف؟')) return; App.deleteItemApp(id); renderItemsPage(); App.populateAllSelects(); }
+initApp().then(renderItemsPage);
+</script>
+</body>
+</html>

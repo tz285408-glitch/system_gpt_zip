@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>فاتورة المشتريات</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>🧾 مشتريات</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label>طريقة الدفع</label>
+        <select id="payType"><option>نقد</option><option>بنك</option><option>آجل</option></select>
+        <label>المورد (إن كان آجل)</label>
+        <select id="selectSupplier"></select>
+        <label>تاريخ الفاتورة</label>
+        <input id="purDate" type="datetime-local">
+      </div>
+      <hr>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="purchaseItemSelect"></select>
+        <input id="purchaseQty" type="number" placeholder="الكمية" style="width:110px">
+        <input id="purchasePrice" type="number" placeholder="السعر (تلقائي)" style="width:140px">
+        <button onclick="addPurchaseLine()">➕ إضافة للصنف</button>
+        <button onclick="openPickItemModal('purchase')">🔎 اختيار صنف</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>سطر الفاتورة</h4>
+      <table id="purLines"><thead><tr><th>#</th><th>رقم الصنف</th><th>الاسم</th><th>الوحدة</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th><th>تحكم</th></tr></thead><tbody></tbody></table>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
+        <label>المجموع:<span id="purSubtotal">0.00</span></label>
+        <label>الخصم:<input id="purDiscount" type="number" value="0"></label>
+        <label>الضريبة:<input id="purTax" type="number" value="0"></label>
+        <label>النقل:<input id="purShip" type="number" value="0"></label>
+        <label>صافي:<span id="purNet">0.00</span></label>
+        <button onclick="savePurchaseInvoiceUI()">💾 حفظ الفاتورة</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>مرتجعات المشتريات</h4>
+      <p>عرض مرتجعات محفوظة</p>
+      <table id="prTable"><thead><tr><th>#</th><th>رقم الفاتورة</th><th>المبلغ</th><th>التاريخ</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div id="pickModal" class="modal-backdrop"><div class="modal">
+  <h3>اختيار صنف</h3>
+  <input id="pickerSearch" placeholder="ابحث بالاسم او الرقم" style="width:60%">
+  <table id="pickerTable"><thead><tr><th>#</th><th>الرقم</th><th>الاسم</th><th>الوحدة</th><th>سعر شراء</th><th>سعر بيع</th><th>اختيار</th></tr></thead><tbody></tbody></table>
+  <div style="text-align:right"><button onclick="closePick()">إغلاق</button></div>
+</div></div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+let currentContext = null;
+function renderSuppliersSelect(){ const el=document.getElementById('selectSupplier'); el.innerHTML=''; const arr=DB.getSuppliers(); arr.forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.text=`${s.id} - ${s.name}`; el.appendChild(o); }); }
+function renderPicker(){ const tbody=document.querySelector('#pickerTable tbody'); tbody.innerHTML=''; const items=DB.getItems(); items.forEach((it,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${it.id}</td><td>${it.name}</td><td>${it.unit}</td><td>${it.buy||0}</td><td>${it.sell||0}</td><td><button onclick="pickItem(${it.id})">اختيار</button></td>`; tbody.appendChild(tr); }); }
+function openPickItemModal(ctx){ currentContext=ctx; document.getElementById('pickModal').style.display='flex'; renderPicker(); }
+function closePick(){ document.getElementById('pickModal').style.display='none'; currentContext=null; }
+function pickItem(itemId){
+  const it = DB.getItems().find(x=>x.id==itemId);
+  if(!it) return;
+  if(currentContext==='purchase'){
+    document.getElementById('purchaseItemSelect').value = it.id;
+    document.getElementById('purchasePrice').value = it.buy||0;
+  } else if(currentContext==='sale'){
+    document.getElementById('salesItemSelect').value = it.id;
+    (document.getElementById('salesPrice')||{}).value = it.sell||0;
+  }
+  closePick();
+}
+
+function addPurchaseLine(){
+  const sel = document.getElementById('purchaseItemSelect'); const itemId = Number(sel.value);
+  const qty = Number(document.getElementById('purchaseQty').value||0); const price = Number(document.getElementById('purchasePrice').value||0);
+  if(!itemId || qty<=0) return alert('اختر الصنف وادخل كمية صحيحة');
+  const item = DB.getItems().find(x=>x.id==itemId);
+  const tbody=document.querySelector('#purLines tbody');
+  const tr=document.createElement('tr');
+  const idx = tbody.rows.length+1;
+  tr.innerHTML = `<td>${idx}</td><td>${itemId}</td><td>${item.name}</td><td>${item.unit}</td><td><input type="number" value="${qty}" class="line-qty"></td><td><input type="number" value="${price}" class="line-price"></td><td class="line-sum">${(qty*price).toFixed(2)}</td><td><button onclick="this.closest('tr').remove(); updatePurTotals()">✖</button></td>`;
+  tbody.appendChild(tr); updatePurTotals();
+  document.getElementById('purchaseQty').value=''; document.getElementById('purchasePrice').value='';
+  tr.querySelector('.line-qty').addEventListener('input', updatePurTotals);
+  tr.querySelector('.line-price').addEventListener('input', updatePurTotals);
+}
+
+function updatePurTotals(){
+  const tbody=document.querySelector('#purLines tbody'); let subtotal=0, count=0;
+  Array.from(tbody.rows).forEach(r=>{
+    const qty=Number(r.querySelector('.line-qty').value||0); const price=Number(r.querySelector('.line-price').value||0);
+    r.querySelector('.line-sum').textContent = (qty*price).toFixed(2);
+    subtotal += qty*price; count += qty;
+  });
+  document.getElementById('purSubtotal').textContent = subtotal.toFixed(2);
+  const disc=Number(document.getElementById('purDiscount').value||0); const tax=Number(document.getElementById('purTax').value||0); const ship=Number(document.getElementById('purShip').value||0);
+  document.getElementById('purNet').textContent = (subtotal - disc + tax + ship).toFixed(2);
+}
+
+function savePurchaseInvoiceUI(){
+  const lines = Array.from(document.querySelectorAll('#purLines tbody tr')).map(r=>{
+    return { itemId: Number(r.cells[1].innerText), name: r.cells[2].innerText, unit: r.cells[3].innerText, qty: Number(r.querySelector('.line-qty').value||0), price: Number(r.querySelector('.line-price').value||0) }
+  });
+  const payType = document.getElementById('payType').value;
+  const supplierId = Number(document.getElementById('selectSupplier').value) || null;
+  const discount = Number(document.getElementById('purDiscount').value||0);
+  const tax = Number(document.getElementById('purTax').value||0);
+  const ship = Number(document.getElementById('purShip').value||0);
+  const res = App.savePurchaseInvoice({payType, supplierId, lines, discount, tax, shipping:ship});
+  if(res.ok){ alert('تم حفظ فاتورة المشتريات'); document.querySelector('#purLines tbody').innerHTML=''; updatePurTotals(); renderPurchaseReturns(); App.populateAllSelects(); } else alert(res.msg||'خطأ');
+}
+
+function renderPurchaseReturns(){
+  const tbody=document.querySelector('#prTable tbody'); tbody.innerHTML=''; const arr=DB.getPurchaseReturns();
+  arr.forEach((r,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${r.invoiceNo}</td><td>${Number(r.subtotal).toFixed(2)}</td><td>${r.date||r.savedAt}</td>`; tbody.appendChild(tr);});
+}
+
+initApp().then(()=>{ renderSuppliersSelect(); renderPicker(); renderPurchaseReturns(); document.getElementById('pickModal').style.display='none'; });
+</script>
+</body>
+</html>

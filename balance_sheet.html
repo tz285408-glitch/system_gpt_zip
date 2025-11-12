@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الميزانية العمومية</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>📈 الميزانية العمومية</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>الميزانية العمومية (مبسطة)</h3>
+      <table id="balanceTbl"><thead><tr><th>الحساب</th><th>مدين</th><th>دائن</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function renderBalance(){
+  const acc=App.computeAccountStatement(); const tbody=document.querySelector('#balanceTbl tbody'); tbody.innerHTML='';
+  Object.keys(acc).forEach(k=>{ const a=acc[k]; const tr=document.createElement('tr'); tr.innerHTML=`<td>${k}</td><td>${(a.debit||0).toFixed(2)}</td><td>${(a.credit||0).toFixed(2)}</td>`; tbody.appendChild(tr); });
+}
+initApp().then(renderBalance);
+</script>
+</body>
+</html>

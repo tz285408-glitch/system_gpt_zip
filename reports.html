@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>التقارير</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>📊 التقارير</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>تقارير فواتير المشتريات</h3>
+      <table id="repPur"><thead><tr><th>#</th><th>رقم</th><th>المبلغ</th><th>طريقة الدفع</th><th>التاريخ</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card">
+      <h3>تقارير فواتير المبيعات</h3>
+      <table id="repSale"><thead><tr><th>#</th><th>رقم</th><th>المبلغ</th><th>طريقة الدفع</th><th>التاريخ</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card">
+      <h3>ملخص الحسابات</h3>
+      <button onclick="renderAccountStatement()">عرض كشف الحساب</button>
+      <pre id="summaryBox" style="white-space:pre-wrap"></pre>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function renderReports(){
+  const t1=document.querySelector('#repPur tbody'); t1.innerHTML=''; const pur=DB.getPurchases();
+  pur.forEach((p,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${p.invoiceNo}</td><td>${Number(p.net).toFixed(2)}</td><td>${p.payType}</td><td>${p.date} ${p.time}</td>`; t1.appendChild(tr); });
+  const t2=document.querySelector('#repSale tbody'); t2.innerHTML=''; const sal=DB.getSales();
+  sal.forEach((s,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${s.invoiceNo}</td><td>${Number(s.net).toFixed(2)}</td><td>${s.payType}</td><td>${s.date} ${s.time}</td>`; t2.appendChild(tr); });
+}
+function renderAccountStatement(){
+  const acc=App.computeAccountStatement();
+  let out='حساب | مدين | دائن | الرصيد | الحالة
+';
+  for(const k of Object.keys(acc)){
+    out += `${k} | ${acc[k].debit.toFixed(2)} | ${acc[k].credit.toFixed(2)} | ${acc[k].balance.toFixed(2)} | ${acc[k].status}
+`;
+  }
+  document.getElementById('summaryBox').textContent = out;
+}
+initApp().then(renderReports);
+</script>
+</body>
+</html>

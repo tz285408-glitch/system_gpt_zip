@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>دفتر الأستاذ</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>📚 دفتر الأستاذ</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>دفتر الأستاذ - ملخص الحسابات</h3>
+      <table id="ledgerTbl"><thead><tr><th>الحساب</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function renderLedger(){
+  const acc = App.computeAccountStatement();
+  const tbody=document.querySelector('#ledgerTbl tbody'); tbody.innerHTML='';
+  Object.keys(acc).forEach(k=>{ const a=acc[k]; const tr=document.createElement('tr'); tr.innerHTML=`<td>${k}</td><td>${(a.debit||0).toFixed(2)}</td><td>${(a.credit||0).toFixed(2)}</td><td>${a.balance.toFixed(2)} ${a.status}</td>`; tbody.appendChild(tr); });
+}
+initApp().then(renderLedger);
+</script>
+</body>
+</html>

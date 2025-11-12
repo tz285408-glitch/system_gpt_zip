@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>إعدادات النظام</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>⚙️ إعدادات النظام</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>بيانات الشركة</h3>
+      <input id="sysName" placeholder="اسم الشركة">
+      <input id="sysLogo" type="file" accept="image/*">
+      <button onclick="saveSettings()">حفظ</button>
+    </div>
+    <div class="card">
+      <h3>الحساب الإداري</h3>
+      <input id="adminUser" placeholder="اسم المستخدم">
+      <input id="adminPass" placeholder="كلمة المرور">
+      <button onclick="saveAdmin()">حفظ حساب المدير</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function saveSettings(){
+  const name=document.getElementById('sysName').value.trim(); const file=document.getElementById('sysLogo').files[0];
+  if(name) localStorage.setItem('companyName', name);
+  if(file){ const r=new FileReader(); r.onload=e=>{ localStorage.setItem('companyLogo', e.target.result); alert('تم الحفظ'); }; r.readAsDataURL(file); } else { alert('تم الحفظ'); }
+}
+function saveAdmin(){ const u=document.getElementById('adminUser').value.trim(); const p=document.getElementById('adminPass').value.trim(); if(!u||!p) return alert('املأ الحقول'); localStorage.setItem('adminUser', u); localStorage.setItem('adminPass', p); alert('تم حفظ بيانات المدير'); }
+initApp().then(()=>{ document.getElementById('sysName').value = localStorage.getItem('companyName')||''; });
+</script>
+</body>
+</html>

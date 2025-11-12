@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>قائمة الأرباح والخسائر</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>💵 الأرباح والخسائر</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>قائمة الأرباح والخسائر (مبسطة)</h3>
+      <pre id="plBox" style="white-space:pre-wrap"></pre>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function renderPL(){
+  const t = App.computeTrialBalance();
+  const revenue = t.salesTotal;
+  const cogs = t.cogs;
+  const expenses = 0;
+  const netProfit = revenue - cogs - expenses;
+  const out = `إيرادات المبيعات: ${revenue.toFixed(2)}\nتكلفة المبيعات: ${cogs.toFixed(2)}\nالمصروفات: ${expenses.toFixed(2)}\nصافي الربح: ${netProfit.toFixed(2)}`;
+  document.getElementById('plBox').textContent=out;
+}
+initApp().then(renderPL);
+</script>
+</body>
+</html>

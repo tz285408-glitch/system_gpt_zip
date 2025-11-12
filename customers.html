@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>العملاء</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div class="logo card"><img src="assets/logo.png" onerror="this.src='https://via.placeholder.com/48'"><span>👥 العملاء</span></div>
+<div class="app">
+  <div class="sidebar card"><a href="index.html">◀ رجوع</a></div>
+  <div class="main">
+    <div class="card">
+      <h3>إضافة عميل</h3>
+      <input id="cu_name" placeholder="اسم العميل">
+      <input id="cu_phone" placeholder="الهاتف">
+      <input id="cu_addr" placeholder="العنوان">
+      <button onclick="doAddCustomer()">إضافة عميل</button>
+    </div>
+    <div class="card">
+      <h3>بيانات العملاء</h3>
+      <table id="cusTable"><thead><tr><th>#</th><th>رقم</th><th>الاسم</th><th>هاتف</th><th>عنوان</th><th>تحكم</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+function renderCustomersPage(){
+  const tbody=document.querySelector('#cusTable tbody'); tbody.innerHTML=''; const arr=DB.getCustomers();
+  arr.forEach((c,i)=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${c.id}</td><td>${c.name}</td><td>${c.phone||''}</td><td>${c.address||''}</td><td><button onclick="editCustomer(${c.id})">تعديل</button> <button onclick="removeCustomer(${c.id})">حذف</button></td>`; tbody.appendChild(tr);});
+}
+function doAddCustomer(){ const n=document.getElementById('cu_name').value.trim(); const p=document.getElementById('cu_phone').value.trim(); const a=document.getElementById('cu_addr').value.trim(); if(!n) return alert('الاسم مطلوب'); App.addCustomerApp(n,p,a); document.getElementById('cu_name').value='';document.getElementById('cu_phone').value='';document.getElementById('cu_addr').value=''; renderCustomersPage(); App.populateAllSelects();}
+function editCustomer(id){ const arr=DB.getCustomers(); const c=arr.find(x=>x.id==id); if(!c) return; const name=prompt('الاسم',c.name); if(name===null) return; const phone=prompt('الهاتف',c.phone||''); const addr=prompt('العنوان',c.address||''); App.updateCustomerApp(id,{name,phone,address:addr}); renderCustomersPage(); }
+function removeCustomer(id){ if(!confirm('حذف العميل؟')) return; App.deleteCustomerApp(id); renderCustomersPage(); App.populateAllSelects();}
+initApp().then(renderCustomersPage);
+</script>
+</body>
+</html>
