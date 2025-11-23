@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام الأصناف والسلة - محسن</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal&display=swap');
+body{font-family:"Tajawal",sans-serif;direction:rtl;background:#f0f8ff;margin:0;padding:0;}
+h2,h3{text-align:center;color:#0d6efd;margin:15px 0;}
+.container{width:95%;max-width:1200px;margin:auto;padding:15px;}
+input, button{padding:10px;border-radius:8px;border:1px solid #ccc;font-size:16px;}
+button{cursor:pointer;background:#0d6efd;color:#fff;border:none;}
+button:hover{background:#084298;}
+
+table{width:100%;border-collapse:collapse;margin-top:15px;font-size:14px;}
+th,td{border:1px solid #ccc;padding:8px;text-align:center;white-space:normal;overflow-wrap:break-word;}
+th{background:#0d6efd;color:#fff;cursor:pointer;}
+
+tr:nth-child(even){background:#e7f1ff;}
+.table-container{overflow-x:auto;width:100%;}
+#reader,#readerCart{width:100%;margin:10px auto;display:none;}
+.autocomplete{border:1px solid #ccc;border-radius:8px;max-height:150px;overflow-y:auto;background:#fff;position:absolute;z-index:1000;width:95%;}
+.autocomplete div{padding:8px;cursor:pointer;}
+.autocomplete div:hover{background:#d0e4ff;}
+#cartMessage{color:#155724;background:#d4edda;padding:10px;margin-top:10px;border-radius:8px;display:none;text-align:center;}
+
+
+
+    header {
+      background: #007bff;
+      color: white;
+      padding: 15px;
+      text-align: center;
+    }
+    nav {
+      background: #e9ecef;
+      display: flex;
+      justify-content: space-around;
+      padding: 10px;
+    }
+    nav button {
+      padding: 10px 20px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    nav button:hover {
+      background: #0056b3;
+    }
+    .content {
+      padding: 20px;
+    }
+    .form-section {
+      display: none;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px #ccc;
+      margin-top: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+</style>
+</head>
+<body>
+<nav>
+  <button onclick="showSection('ahmad2')">دخول🛸</button>
+  </nav>
+  
+<div class="clasarafat">
+<section id="ahmad2" class="form-section">
+
+<h2>📦 إدارة الأصناف 🛒 السلة</h2>
+<nav>
+  <button onclick="showSection('arafat')">إدارة الأصناف</button>
+</nav>
+</section>
+</div>
+
+<div class="container">
+<section id="arafat" class="form-section">
+<!-- إدارة الأصناف -->
+<h3>إدارة الأصناف</h3>
+
+<!-- أضف هذا داخل قسم إدارة الأصناف (#arafat) -->
+<div id="reader"></div> <!-- ماسح QR للأصناف -->
+
+<form id="itemForm">
+<div style="margin-top:5px; display:flex; gap:10px; flex-wrap:wrap;">
+  <div style="flex:1 1 240px; min-width:200px;">
+    <label>اسم الصنف:</label>
+    <input type="text" id="itemName" placeholder="اكتب اسم الصنف" required>
+  </div>
+
+  <!-- رسالة التنبيه -->
+<div id="itemMessage" style="
+  display:none;
+  color:#856404;
+  background:#fff3cd;
+  padding:15px 20px;
+  margin:50px auto;
+  border-radius:10px;
+  text-align:center;
+  font-size:24px;      /* حجم الخط */
+  font-weight:bold;     /* جعل الخط عريض */
+  width:fit-content;    /* عرض يتناسب مع النص */
+  box-shadow: 0 0 10px rgba(0,0,3,0.2); /* تأثير خفيف */
+">
+</div>
+  
+  <div style="flex:1 1 240px; min-width:200px;">
+    <label>رمز الصنف:</label>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="itemCode" placeholder="امسح أو اكتب الرمز" required style="flex:1;">
+      <button type="button" id="scanItemBtn">📷 مسح رمز الصنف</button>
+    </div>
+  </div>
+<div style="display:flex; flex-direction:column; gap:15px;">
+
+  <!-- الوحدة -->
+  <div>
+    <label>الوحدة:</label>
+    <input type="text" id="itemUnit" placeholder="الوحدة مثل: حبة، كيلو، لتر"
+           required style="width:100%; margin-top:5px;">
+  </div>
+
+  <!-- سعر الشراء + سعر البيع -->
+  <div style="display:flex; gap:10px;">
+    
+    <div style="flex:1;">
+      <label>سعر الشراء:</label>
+      <input type="number" id="itemCost" placeholder="سعر الشراء"
+             style="width:100%; margin-top:5px;">
+    </div>
+
+    <div style="flex:1;">
+      <label>سعر البيع:</label>
+      <input type="number" id="itemPrice" placeholder="سعر البيع"
+             style="width:100%; margin-top:5px;">
+    </div>
+
+  </div>
+
+  <!-- الأزرار -->
+  <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
+
+    <button type="submit">💾 حفظ الصنف</button>
+
+    <button type="button" id="cancelItemBtn" style="background:#dc3545;">
+      ❌ إلغاء
+    </button>
+
+  </div>
+
+</div>
+</form>
+
+
+<div style="margin-top:5px; display:flex; gap:0px; flex-wrap:wrap;">
+
+  <select id="sortSelect">
+    <option value="">-- فرز حسب --</option>
+    <option value="name-asc">اسم الصنف تصاعدي</option>
+    <option value="name-desc">اسم الصنف تنازلي</option>
+    <option value="code-asc">رمز الصنف تصاعدي</option>
+    <option value="code-desc">رمز الصنف تنازلي</option>
+    <option value="cost-asc">أقل سعر شراء</option>
+    <option value="cost-desc">أعلى سعر شراء</option>
+    <option value="price-asc">أقل سعر بيع</option>
+    <option value="price-desc">أعلى سعر بيع</option>
+  </select>
+ <button id="exportExcelBtn">📤 Excel</button> 
+  <input type="file" id="importExcel" accept=".xlsx,.xls">
+  <input type="text" id="searchInput" placeholder="🔍 ابحث عن أي صنف" style="flex:1;">
+</div>
+
+<div id="itemsCount" style="text-align:center; font-weight:bold; margin-bottom:10px;">
+  عدد الأصناف: 0
+</div>
+
+<div class="table-container">
+<table id="itemsTable">
+  <thead>
+    <tr>
+      <th>اسم الصنف</th>
+      <th>رمز الصنف</th>
+      <th>الوحدة</th>
+      <th>سعر الشراء</th>
+      <th>سعر البيع</th>
+      <th>الإجراءات</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+</div>
+<hr>
+</section>
+<!-- السلة -->
+</div>
+<script>
+// ================ عرض الأقسام =================
+function showSection(id) {
+  document.querySelectorAll('.form-section').forEach(s => s.style.display = 'none');
+  document.getElementById(id).style.display = 'block';
+}
+
+// ================= إدارة الأصناف =================
+const itemForm = document.getElementById("itemForm");
+const itemMessage = document.getElementById("itemMessage");
+const itemName = document.getElementById("itemName");
+const itemCode = document.getElementById("itemCode");
+const itemUnit = document.getElementById("itemUnit");
+const itemCost = document.getElementById("itemCost");
+const itemPrice = document.getElementById("itemPrice");
+const itemsTableBody = document.querySelector("#itemsTable tbody");
+let editIndex = null;
+
+function loadItems() {
+  let items = JSON.parse(localStorage.getItem("itemsList") || "[]");
+  const sortValue = document.getElementById("sortSelect").value;
+  if(sortValue){
+    const [field,order] = sortValue.split("-");
+    items.sort((a,b)=>{
+      if(field==="name"||field==="code") return order==="asc"?a[field].localeCompare(b[field]):b[field].localeCompare(a[field]);
+      return order==="asc"?a[field]-b[field]:b[field]-a[field];
+    });
+  }
+  itemsTableBody.innerHTML="";
+  items.forEach((it,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${it.name}</td><td>${it.code}</td><td>${it.unit}</td><td>${it.cost||''}</td><td>${it.price||''}</td>
+      <td><div style="display:flex; gap:1px;">
+      <button onclick="editItem(${i})">✏️ تعديل</button>
+      <button onclick="deleteItem(${i})" style="background:#dc3545;">🗑️ حذف</button>
+      </div></td>`;
+    itemsTableBody.appendChild(tr);
+  });
+  updateItemsCount();
+}
+
+loadItems();
+
+itemForm.addEventListener("submit", e=>{
+  e.preventDefault();
+  let items = JSON.parse(localStorage.getItem("itemsList") || "[]");
+  const nameExists = items.some((it,i)=>it.name===itemName.value && i!==editIndex);
+  if(nameExists && !confirm("⚠️ اسم الصنف موجود مسبقاً! استمر أم رجوع؟")) return;
+  const codeExists = items.some((it,i)=>it.code===itemCode.value && i!==editIndex);
+  if(codeExists){ alert("⚠️ الرمز موجود مسبقًا!"); return; }
+  const newItem = {name:itemName.value, code:itemCode.value, unit:itemUnit.value, cost:itemCost.value, price:itemPrice.value};
+  if(editIndex!==null){ items[editIndex] = newItem; editIndex=null; } else { items.push(newItem); }
+  localStorage.setItem("itemsList", JSON.stringify(items));
+  itemForm.reset();
+  loadItems();
+});
+// ================= عداد عدد الاصناف فيالجدول =================
+function updateItemsCount() {
+  const items = JSON.parse(localStorage.getItem("itemsList") || "[]");
+  document.getElementById("itemsCount").textContent = `عدد الأصناف: ${items.length}`;
+}
+
+window.editItem = i => {
+  let items = JSON.parse(localStorage.getItem("itemsList") || "[]");
+  const it = items[i];
+  showItem(it);
+  editIndex = i;
+};
+
+window.deleteItem = i => {
+  let items = JSON.parse(localStorage.getItem("itemsList") || "[]");
+  if(confirm("هل تريد حذف هذا الصنف؟")){
+    items.splice(i,1); localStorage.setItem("itemsList", JSON.stringify(items)); loadItems();
+  }
+};
+
+document.getElementById("searchInput").addEventListener("input", ()=>{
+  const val = document.getElementById("searchInput").value.toLowerCase();
+  document.querySelectorAll("#itemsTable tbody tr").forEach(r=>r.style.display = r.innerText.toLowerCase().includes(val) ? "" : "none");
+});
+document.getElementById("sortSelect").addEventListener("change", loadItems);
+
+// ==============تعبية حقول الصنف عند التعديل او الحذف== دوال مساعدة إدارة الأصناف ================
+function showItem(item) {
+  itemName.value = item.name || "";
+  itemCode.value = item.code || "";
+  itemUnit.value = item.unit || "";
+  itemCost.value = item.cost || "";
+  itemPrice.value = item.price || "";
+  editIndex = null;
+}
+
+// ================= ماسح QR للأصناف =================
+let isScanning = false;
+const reader = document.getElementById("reader");
+const scanItemBtn = document.getElementById("scanItemBtn");
+const qr = new Html5Qrcode("reader");
+
+scanItemBtn.onclick = async () => {
+  if (!isScanning) {
+    const cams = await Html5Qrcode.getCameras();
+    if (!cams.length) return alert("لم يتم العثور على كاميرا");
+    let cam = cams.find(c => c.label.toLowerCase().includes("back"))?.id || cams[0].id;
+    reader.style.display = "block";
+
+    qr.start(cam, { fps: 15, qrbox: { width: 280, height: 160 } },
+      (decoded) => {
+        const itemsList = JSON.parse(localStorage.getItem("itemsList") || "[]");
+        const item = itemsList.find(i => i.code === decoded);
+
+        if(item){
+          showItem(item); // الصنف موجود
+          itemMessage.style.display = "block";
+          itemMessage.textContent = "⚠️ الصنف موجود مسبقاً!";
+          setTimeout(()=>{ itemMessage.style.display = "none"; }, 3000);
+        } else {
+          itemCode.value = decoded; // الرمز فقط
+          itemName.value = "";
+          itemUnit.value = "";
+          itemCost.value = "";
+          itemPrice.value = "";
+          itemMessage.style.display = "none";
+        }
+
+        reader.style.display = "none";
+        qr.stop();
+        isScanning = false;
+        scanItemBtn.textContent = "📷 مسح";
+      }
+    );
+
+    isScanning = true;
+    scanItemBtn.textContent = "⏹️ إيقاف";
+  } else {
+    qr.stop();
+    reader.style.display = "none";
+    scanItemBtn.textContent = "📷 مسح";
+    isScanning = false;
+  }
+};
+
+// ================= دوال مساعدة =================
+
+// دالة تفريغ الحقول
+function clearItemFields() {
+  itemName.value = "";
+  itemCode.value = "";
+  itemUnit.value = "";
+  itemCost.value = "";
+  itemPrice.value = "";
+  editIndex = null;
+  itemMessage.style.display = "none";
+}
+
+// ربط زر الإلغاء
+cancelItemBtn.addEventListener("click", clearItemFields);
+// ================= استيراد Excel =================
+const importExcelInput = document.getElementById("importExcel");
+function getCellValue(obj, keys) {
+  for (let k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null) {
+      return String(obj[k]).trim();
+    }
+  }
+  return "";
+}
+
+importExcelInput.addEventListener("change", function (e) {
+
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function (evt) {
+    let workbook;
+    try {
+      workbook = XLSX.read(evt.target.result, { type: "binary" });
+    } catch {
+      workbook = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
+    }
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet) return alert("❌ الملف غير صالح");
+
+    let rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (!rows.length) return alert("❌ ملف Excel فارغ");
+
+    // تحويل الصفوف إلى صيغة موحدة
+    const mapped = rows.map(row => {
+      if (Array.isArray(row)) {
+        return {
+          name: String(row[0] || "").trim(),
+          code: String(row[1] || "").trim(),
+          unit: String(row[2] || "").trim(),
+          cost: String(row[3] || "").trim(),
+          price: String(row[4] || "").trim(),
+        };
+      } else {
+        return {
+          name: getCellValue(row, ["name","اسم","اسم الصنف"]),
+          code: getCellValue(row, ["code","رمز","رمز الصنف"]),
+          unit: getCellValue(row, ["unit","الوحدة"]),
+          cost: getCellValue(row, ["cost","سعر الشراء"]),
+          price: getCellValue(row, ["price","سعر البيع"]),
+        };
+      }
+    });
+
+    let items = JSON.parse(localStorage.getItem("itemsList") || "[]");
+
+    // استبدال أو إضافة الأصناف حسب رمز الصنف
+    mapped.forEach(im => {
+      if (!im.code) return;
+
+      const code = String(im.code).trim();
+
+      const idx = items.findIndex(it => String(it.code).trim() === code);
+
+      const newItem = {
+        name: im.name,
+        code: code,
+        unit: im.unit,
+        cost: im.cost,
+        price: im.price
+      };
+
+      if (idx !== -1) items[idx] = newItem;
+      else items.push(newItem);
+    });
+
+    localStorage.setItem("itemsList", JSON.stringify(items));
+    loadItems();
+
+    showImportMessage("✔️ تم استيراد الملف وتحديث الأصناف");
+    importExcelInput.value = "";
+  };
+
+  reader.readAsBinaryString(file);
+});
+
+function showImportMessage(text) {
+  const msg = document.createElement("div");
+  msg.textContent = text;
+  msg.style = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #28a745;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    z-index: 9999;
+  `;
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 3000);
+}
+
+// ================= تصدير Excel =================
+document.getElementById("exportExcelBtn").addEventListener("click", function () {
+
+    // جلب البيانات من LocalStorage
+    let items = JSON.parse(localStorage.getItem("itemsList") || "[]");
+
+    if (items.length === 0) {
+        alert("⚠️ لا توجد بيانات في الجدول للتصدير");
+        return;
+    }
+
+    // تحويل البيانات إلى Sheet
+    const worksheet = XLSX.utils.json_to_sheet(items);
+
+    // إنشاء ملف Excel جديد
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Items");
+
+    // حفظ الملف
+    XLSX.writeFile(workbook, "items.xlsx");
+
+    // رسالة نجاح
+    showExportMessage("✔️ تم تصدير الجدول إلى Excel");
+});
+
+function showExportMessage(text) {
+    const msg = document.createElement("div");
+    msg.textContent = text;
+    msg.style = `
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #007bff;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 16px;
+      z-index: 9999;
+    `;
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 3000);
+}
+</script>
+<!-- رسالة تم حفض الصنف التنبيه -->
+<div id="saveMessage" style="
+  display:none;
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  background:#d4edda;
+  color:#155724;
+  border:2px solid #28a745;
+  padding:20px 40px;
+  font-size:24px;
+  font-weight:bold;
+  border-radius:10px;
+  box-shadow:0 0 15px rgba(0,0,0,0.2);
+  z-index:9999;
+  text-align:center;
+">
+  تم الحفظ ✅
+</div>
+
+<script>
+  const fields = ["itemName", "itemCode", "itemUnit", "itemCost", "itemPrice"];
+
+  // تلوين الحقول عند الكتابة
+  fields.forEach(id => {
+    const input = document.getElementById(id);
+    input.addEventListener("input", () => {
+      if (input.value.trim() !== "") {
+        input.style.background = "#d4edda";
+        input.style.border = "2px solid #28a745";
+      } else {
+        input.style.background = "";
+        input.style.border = "";
+      }
+    });
+  });
+
+  // زر الإلغاء
+  const cancelBtn = document.getElementById("cancelItemBtn");
+  cancelBtn.addEventListener("click", () => {
+    fields.forEach(id => {
+      const input = document.getElementById(id);
+      input.value = "";
+      input.style.background = "";
+      input.style.border = "";
+    });
+  });
+
+  // عند الضغط على حفظ الصنف
+  const form = document.getElementById("itemForm");
+  const saveMessage = document.getElementById("saveMessage");
+
+  form.addEventListener("submit", function(e) {
+    e.preventDefault(); // منع إعادة تحميل الصفحة
+    
+    // هنا ضع كود الحفظ الأصلي إذا موجود
+    // ...
+
+    // إعادة الألوان والحقول
+    fields.forEach(id => {
+      const input = document.getElementById(id);
+      input.style.background = "";
+      input.style.border = "";
+      input.value = ""; 
+    });
+
+    // إظهار رسالة الحفظ
+    saveMessage.style.display = "block";
+
+    // إخفاء الرسالة بعد 2.5 ثانية
+    setTimeout(() => {
+      saveMessage.style.display = "none";
+    }, 2500);
+  });
+</script>
+</body>
+</html>
+
