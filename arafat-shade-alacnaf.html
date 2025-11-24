@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>نظام الأصناف والسلة - محسن (Firestore)</title>
+
+<!-- مكتبات خارجية -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal&display=swap');
+body{font-family:"Tajawal",sans-serif;direction:rtl;background:#f0f8ff;margin:0;padding:0;}
+h2,h3{text-align:center;color:#0d6efd;margin:15px 0;}
+.container{width:95%;max-width:1200px;margin:auto;padding:15px;}
+input, button{padding:10px;border-radius:8px;border:1px solid #ccc;font-size:16px;}
+button{cursor:pointer;background:#0d6efd;color:#fff;border:none;}
+button:hover{background:#084298;}
+
+table{width:100%;border-collapse:collapse;margin-top:15px;font-size:14px;}
+th,td{border:1px solid #ccc;padding:8px;text-align:center;white-space:normal;overflow-wrap:break-word;}
+th{background:#0d6efd;color:#fff;cursor:pointer;}
+
+tr:nth-child(even){background:#e7f1ff;}
+.table-container{overflow-x:auto;width:100%;}
+#reader,#readerCart{width:100%;margin:10px auto;display:none;}
+.autocomplete{border:1px solid #ccc;border-radius:8px;max-height:150px;overflow-y:auto;background:#fff;position:absolute;z-index:1000;width:95%;}
+.autocomplete div{padding:8px;cursor:pointer;}
+.autocomplete div:hover{background:#d0e4ff;}
+#cartMessage{color:#155724;background:#d4edda;padding:10px;margin-top:10px;border-radius:8px;display:none;text-align:center;}
+
+
+
+    header {
+      background: #007bff;
+      color: white;
+      padding: 15px;
+      text-align: center;
+    }
+    nav {
+      background: #e9ecef;
+      display: flex;
+      justify-content: space-around;
+      padding: 10px;
+    }
+    nav button {
+      padding: 10px 20px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    nav button:hover {
+      background: #0056b3;
+    }
+    .content {
+      padding: 20px;
+    }
+    .form-section {
+      display: none;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px #ccc;
+      margin-top: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+</style>
+</head>
+<body>
+<nav>
+  <button onclick="showSection('ahmad2')">دخول🛸</button>
+</nav>
+  
+<div class="clasarafat">
+<section id="ahmad2" class="form-section">
+<h2>📦 إدارة الأصناف 🛒 السلة</h2>
+<nav>
+  <button onclick="showSection('arafat')">إدارة الأصناف</button>
+</nav>
+</section>
+</div>
+
+<div class="container">
+<section id="arafat" class="form-section">
+<h3>إدارة الأصناف</h3>
+<div id="reader"></div>
+
+<form id="itemForm">
+<div style="margin-top:5px; display:flex; gap:10px; flex-wrap:wrap;">
+  <div style="flex:1 1 240px; min-width:200px;">
+    <label>اسم الصنف:</label>
+    <input type="text" id="itemName" placeholder="اكتب اسم الصنف" required>
+  </div>
+
+<div id="itemMessage" style="
+  display:none;
+  color:#856404;
+  background:#fff3cd;
+  padding:15px 20px;
+  margin:50px auto;
+  border-radius:10px;
+  text-align:center;
+  font-size:24px;
+  font-weight:bold;
+  width:fit-content;
+  box-shadow: 0 0 10px rgba(0,0,3,0.2);
+">
+</div>
+  
+  <div style="flex:1 1 240px; min-width:200px;">
+    <label>رمز الصنف:</label>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="itemCode" placeholder="امسح أو اكتب الرمز" required style="flex:1;">
+      <button type="button" id="scanItemBtn">📷 مسح رمز الصنف</button>
+    </div>
+  </div>
+<div style="display:flex; flex-direction:column; gap:15px;">
+
+  <div>
+    <label>الوحدة:</label>
+    <input type="text" id="itemUnit" placeholder="الوحدة مثل: حبة، كيلو، لتر"
+           required style="width:100%; margin-top:5px;">
+  </div>
+
+  <div style="display:flex; gap:10px;">
+    <div style="flex:1;">
+      <label>سعر الشراء:</label>
+      <input type="text" inputmode="decimal" id="itemCost" placeholder="سعر الشراء"
+             style="width:100%; margin-top:5px;">
+    </div>
+
+    <div style="flex:1;">
+      <label>سعر البيع:</label>
+      <input type="text" inputmode="decimal" id="itemPrice" placeholder="سعر البيع"
+             style="width:100%; margin-top:5px;">
+    </div>
+  </div>
+
+  <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
+    <button type="submit">💾 حفظ الصنف</button>
+    <button type="button" id="cancelItemBtn" style="background:#dc3545;">❌ إلغاء</button>
+  </div>
+
+</div>
+</form>
+
+<div style="margin-top:5px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+  <select id="sortSelect">
+    <option value="">-- فرز حسب --</option>
+    <option value="name-asc">اسم الصنف تصاعدي</option>
+    <option value="name-desc">اسم الصنف تنازلي</option>
+    <option value="code-asc">رمز الصنف تصاعدي</option>
+    <option value="code-desc">رمز الصنف تنازلي</option>
+    <option value="cost-asc">أقل سعر شراء</option>
+    <option value="cost-desc">أعلى سعر شراء</option>
+    <option value="price-asc">أقل سعر بيع</option>
+    <option value="price-desc">أعلى سعر بيع</option>
+  </select>
+  <button id="exportExcelBtn">📤 Excel</button> 
+  <input type="file" id="importExcel" accept=".xlsx,.xls">
+  <input type="text" id="searchInput" placeholder="🔍 ابحث عن أي صنف" style="flex:1;">
+</div>
+
+<div id="itemsCount" style="text-align:center; font-weight:bold; margin-bottom:10px;">
+  عدد الأصناف: 0
+</div>
+
+<div class="table-container">
+<table id="itemsTable">
+  <thead>
+    <tr>
+      <th>اسم الصنف</th>
+      <th>رمز الصنف</th>
+      <th>الوحدة</th>
+      <th>سعر الشراء</th>
+      <th>سعر البيع</th>
+      <th>الإجراءات</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+</div>
+<hr>
+</section>
+</div>
+
+<!-- رسالة تم حفض الصنف التنبيه -->
+<div id="saveMessage" style="
+  display:none;
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  background:#d4edda;
+  color:#155724;
+  border:2px solid #28a745;
+  padding:20px 40px;
+  font-size:24px;
+  font-weight:bold;
+  border-radius:10px;
+  box-shadow:0 0 15px rgba(0,0,0,0.2);
+  z-index:9999;
+  text-align:center;
+">
+  تم الحفظ ✅
+</div>
+
+<!-- =============== Firebase (Firestore) via modular SDK =============== -->
+<script type="module">
+  // استبدل القيم في firebaseConfig بقيم مشروعك من لوحة Firebase
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js';
+  import {
+    getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where
+  } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey: "REPLACE_WITH_YOUR_API_KEY",
+    authDomain: "REPLACE_WITH_YOUR_PROJECT.firebaseapp.com",
+    projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
+    storageBucket: "REPLACE_WITH_YOUR_PROJECT.appspot.com",
+    messagingSenderId: "REPLACE",
+    appId: "REPLACE"
+  };
+
+  // تهيئة Firebase و Firestore
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const itemsCol = collection(db, "items");
+
+  // *************** كود التطبيق (يتكامل مع بقية السكربت) ***************
+  // سنصدر بعض الدوال للوصول من سكربت غير module إن احتجنا (لكن هنا كل شيء داخل module)
+  window.firestoreAPI = {
+    db, itemsCol,
+    async fetchAllItems() {
+      const snap = await getDocs(itemsCol);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    async addItem(item) {
+      return await addDoc(itemsCol, item);
+    },
+    async updateItem(id, item) {
+      const d = doc(db, "items", id);
+      return await updateDoc(d, item);
+    },
+    async deleteItem(id) {
+      const d = doc(db, "items", id);
+      return await deleteDoc(d);
+    },
+    async findByCode(code) {
+      if (!code) return [];
+      const q = query(itemsCol, where("code", "==", code));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+  };
+</script>
+
+<script>
+/* الجزء غير-module: الواجهة والمنطق العام */
+const itemForm = document.getElementById("itemForm");
+const itemMessage = document.getElementById("itemMessage");
+const itemName = document.getElementById("itemName");
+const itemCode = document.getElementById("itemCode");
+const itemUnit = document.getElementById("itemUnit");
+const itemCost = document.getElementById("itemCost");
+const itemPrice = document.getElementById("itemPrice");
+const itemsTableBody = document.querySelector("#itemsTable tbody");
+let editId = null; // سيخزن id المستند في Firestore عند التعديل
+let itemsCache = []; // مصفوفة الكائنات المحملة
+
+// ---------- دوال تنسيق الأرقام ----------
+function formatWithCommas(val) {
+  if (val === undefined || val === null || val === "") return "";
+  const s = String(val).replace(/,/g, "");
+  if (s === "") return "";
+  const n = Number(s);
+  if (isNaN(n)) return String(val);
+  return n.toLocaleString(); // يضيف فواصل الآلاف
+}
+
+function stripCommas(val) {
+  if (val === undefined || val === null) return "";
+  return String(val).replace(/,/g, "").trim();
+}
+
+// تنسيق الحقول أثناء الإدخال
+function bindNumberFormatting(input) {
+  input.addEventListener('input', () => {
+    const original = input.value;
+    let cleaned = String(original).replace(/[^\d\.\-]/g, "");
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts.shift() + '.' + parts.join('');
+    }
+    const [intPart, decPart] = cleaned.split('.');
+    let intClean = intPart ? intPart.replace(/^0+(?=\d)/, '') : '';
+    if (intClean === "") intClean = intPart && intPart.includes('0') ? "0" : "";
+    const formattedInt = intClean === "" ? "" : Number(intClean).toLocaleString();
+    input.value = decPart !== undefined ? (formattedInt + '.' + decPart) : formattedInt;
+  });
+  input.addEventListener('blur', () => {
+    if (input.value.trim() === "") return;
+    const raw = stripCommas(input.value);
+    input.value = formatWithCommas(raw);
+  });
+}
+
+bindNumberFormatting(itemCost);
+bindNumberFormatting(itemPrice);
+
+// ================= Firestore integration functions (calls to module API) =================
+async function fetchItems() {
+  try {
+    const res = await window.firestoreAPI.fetchAllItems();
+    // تحويل الحقول إلى سلاسل بسيطة للتوافق
+    return res.map(r => ({
+      id: r.id,
+      name: r.name || "",
+      code: r.code || "",
+      unit: r.unit || "",
+      cost: r.cost === undefined || r.cost === null ? "" : String(r.cost),
+      price: r.price === undefined || r.price === null ? "" : String(r.price)
+    }));
+  } catch (err) {
+    console.error("fetchItems error:", err);
+    alert("حدث خطأ في جلب الأصناف من Firestore. تحقق من الإعدادات في firebaseConfig.");
+    return [];
+  }
+}
+
+async function loadItems() {
+  const sortValue = document.getElementById("sortSelect").value;
+  itemsTableBody.innerHTML = "";
+  itemsCache = await fetchItems();
+
+  if (sortValue) {
+    const [field, order] = sortValue.split("-");
+    itemsCache.sort((a,b) => {
+      if (field === "name" || field === "code") return order === "asc" ? a[field].localeCompare(b[field]) : b[field].localeCompare(a[field]);
+      const an = Number(stripCommas(a[field] || 0));
+      const bn = Number(stripCommas(b[field] || 0));
+      return order === "asc" ? an - bn : bn - an;
+    });
+  }
+
+  itemsCache.forEach((it, i) => {
+    const tr = document.createElement("tr");
+    const costDisplay = formatWithCommas(it.cost);
+    const priceDisplay = formatWithCommas(it.price);
+    tr.innerHTML = `<td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.code)}</td><td>${escapeHtml(it.unit)}</td>
+      <td>${costDisplay||''}</td><td>${priceDisplay||''}</td>
+      <td><div style="display:flex; gap:1px;">
+      <button onclick="editItem(${i})">✏️ تعديل</button>
+      <button onclick="deleteItem(${i})" style="background:#dc3545;">🗑️ حذف</button>
+      </div></td>`;
+    itemsTableBody.appendChild(tr);
+  });
+  updateItemsCount();
+}
+
+// استدعاء أولي لعرض البيانات
+loadItems();
+
+// دوال أمان صغيرة
+function escapeHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+}
+
+// توجيه التركيز للحقول الفارغة المطلوبة
+function focusFirstEmptyField() {
+  const required = [
+    {el: itemName, name: "اسم الصنف"},
+    {el: itemCode, name: "رمز الصنف"},
+    {el: itemUnit, name: "الوحدة"}
+  ];
+  for (let f of required) {
+    if (!f.el.value || !String(f.el.value).trim()) {
+      f.el.focus();
+      f.el.style.border = "2px solid #dc3545";
+      f.el.style.background = "#f8d7da";
+      return {found:true, name:f.name};
+    }
+  }
+  return {found:false};
+}
+
+// حفظ (إضافة أو تحديث) في Firestore
+itemForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const emptyCheck = focusFirstEmptyField();
+  if (emptyCheck.found) {
+    alert("الرجاء تعبئة الحقل: " + emptyCheck.name);
+    return;
+  }
+
+  // تحقق من التكرار في قاعدة البيانات بحسب الاسم أو الرمز
+  // (نقوم بجلب البيانات الحالية من الكاش itemsCache)
+  const nameExists = itemsCache.some(it => it.name === itemName.value && it.id !== editId);
+  if (nameExists && !confirm("⚠️ اسم الصنف موجود مسبقاً! استمر أم رجوع؟")) return;
+  const codeExists = itemsCache.some(it => it.code === itemCode.value && it.id !== editId);
+  if (codeExists) { alert("⚠️ الرمز موجود مسبقًا!"); return; }
+
+  const rawCost = stripCommas(itemCost.value);
+  const rawPrice = stripCommas(itemPrice.value);
+
+  const newItem = {
+    name: itemName.value,
+    code: itemCode.value,
+    unit: itemUnit.value,
+    cost: rawCost,
+    price: rawPrice
+  };
+
+  try {
+    if (editId) {
+      await window.firestoreAPI.updateItem(editId, newItem);
+      editId = null;
+    } else {
+      await window.firestoreAPI.addItem(newItem);
+    }
+    itemForm.reset();
+    [itemName, itemCode, itemUnit, itemCost, itemPrice].forEach(inp => { inp.style.background = ""; inp.style.border = ""; });
+    loadItems();
+    const saveMessage = document.getElementById("saveMessage");
+    saveMessage.style.display = "block";
+    setTimeout(() => saveMessage.style.display = "none", 2500);
+  } catch (err) {
+    console.error("save error:", err);
+    alert("فشل الحفظ إلى Firestore. تحقق من الإعدادات بالكونسول.");
+  }
+});
+
+// عداد عدد الاصناف
+function updateItemsCount() {
+  document.getElementById("itemsCount").textContent = `عدد الأصناف: ${itemsCache.length}`;
+}
+
+window.editItem = (index) => {
+  const it = itemsCache[index];
+  if (!it) return;
+  itemName.value = it.name || "";
+  itemCode.value = it.code || "";
+  itemUnit.value = it.unit || "";
+  itemCost.value = formatWithCommas(it.cost || "");
+  itemPrice.value = formatWithCommas(it.price || "");
+  editId = it.id || null;
+};
+
+window.deleteItem = async (index) => {
+  const it = itemsCache[index];
+  if (!it) return;
+  if (!confirm("هل تريد حذف هذا الصنف؟")) return;
+  try {
+    await window.firestoreAPI.deleteItem(it.id);
+    await loadItems();
+  } catch (err) {
+    console.error("delete error:", err);
+    alert("فشل حذف العنصر من Firestore.");
+  }
+};
+
+document.getElementById("searchInput").addEventListener("input", () => {
+  const val = document.getElementById("searchInput").value.toLowerCase();
+  document.querySelectorAll("#itemsTable tbody tr").forEach(r => r.style.display = r.innerText.toLowerCase().includes(val) ? "" : "none");
+});
+document.getElementById("sortSelect").addEventListener("change", loadItems);
+
+// عرض بيانات في الحقول عند تعديل
+function showItem(item) {
+  itemName.value = item.name || "";
+  itemCode.value = item.code || "";
+  itemUnit.value = item.unit || "";
+  itemCost.value = formatWithCommas(item.cost || "");
+  itemPrice.value = formatWithCommas(item.price || "");
+  editId = item.id || null;
+}
+
+// ================= ماسح QR =================
+let isScanning = false;
+const reader = document.getElementById("reader");
+const scanItemBtn = document.getElementById("scanItemBtn");
+const qr = new Html5Qrcode("reader");
+
+scanItemBtn.onclick = async () => {
+  if (!isScanning) {
+    const cams = await Html5Qrcode.getCameras();
+    if (!cams.length) return alert("لم يتم العثور على كاميرا");
+    let cam = cams.find(c => c.label.toLowerCase().includes("back"))?.id || cams[0].id;
+    reader.style.display = "block";
+    qr.start(cam, { fps: 15, qrbox: { width: 280, height: 160 } },
+      (decoded) => {
+        const item = itemsCache.find(i => i.code === decoded);
+        if (item) {
+          showItem(item);
+          itemMessage.style.display = "block";
+          itemMessage.textContent = "⚠️ الصنف موجود مسبقاً!";
+          setTimeout(()=>{ itemMessage.style.display = "none"; }, 3000);
+        } else {
+          itemCode.value = decoded;
+          itemName.value = ""; itemUnit.value = ""; itemCost.value = ""; itemPrice.value = "";
+          itemMessage.style.display = "none";
+        }
+        reader.style.display = "none";
+        qr.stop();
+        isScanning = false;
+        scanItemBtn.textContent = "📷 مسح";
+      }
+    );
+    isScanning = true;
+    scanItemBtn.textContent = "⏹️ إيقاف";
+  } else {
+    qr.stop();
+    reader.style.display = "none";
+    scanItemBtn.textContent = "📷 مسح";
+    isScanning = false;
+  }
+};
+
+// تفريغ الحقول
+function clearItemFields() {
+  [itemName, itemCode, itemUnit, itemCost, itemPrice].forEach(i => i.value = "");
+  editId = null;
+  itemMessage.style.display = "none";
+  [itemName, itemCode, itemUnit, itemCost, itemPrice].forEach(inp=>{ inp.style.background = ""; inp.style.border = ""; });
+}
+document.getElementById("cancelItemBtn").addEventListener("click", clearItemFields);
+
+// ================= استيراد Excel -> Firestore =================
+const importExcelInput = document.getElementById("importExcel");
+function getCellValue(obj, keys) {
+  for (let k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null) return String(obj[k]).trim();
+  }
+  return "";
+}
+
+importExcelInput.addEventListener("change", async function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function (evt) {
+    let workbook;
+    try {
+      workbook = XLSX.read(evt.target.result, { type: "binary" });
+    } catch {
+      workbook = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
+    }
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet) return alert("❌ الملف غير صالح");
+    let rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (!rows.length) return alert("❌ ملف Excel فارغ");
+
+    const mapped = rows.map(row => {
+      if (Array.isArray(row)) {
+        return {
+          name: String(row[0] || "").trim(),
+          code: String(row[1] || "").trim(),
+          unit: String(row[2] || "").trim(),
+          cost: String(row[3] || "").trim(),
+          price: String(row[4] || "").trim(),
+        };
+      } else {
+        return {
+          name: getCellValue(row, ["name","اسم","اسم الصنف"]),
+          code: getCellValue(row, ["code","رمز","رمز الصنف"]),
+          unit: getCellValue(row, ["unit","الوحدة"]),
+          cost: getCellValue(row, ["cost","سعر الشراء"]),
+          price: getCellValue(row, ["price","سعر البيع"]),
+        };
+      }
+    });
+
+    try {
+      for (const im of mapped) {
+        if (!im.code) continue;
+        // البحث عن مستند بنفس الرمز
+        const found = await window.firestoreAPI.findByCode(im.code);
+        const newItem = {
+          name: im.name, code: im.code, unit: im.unit, cost: im.cost, price: im.price
+        };
+        if (found.length > 0) {
+          // يحدث أول مطابق (يمكن توسيع المنطق لعدة مطابقة)
+          await window.firestoreAPI.updateItem(found[0].id, newItem);
+        } else {
+          await window.firestoreAPI.addItem(newItem);
+        }
+      }
+      await loadItems();
+      showImportMessage("✔️ تم استيراد الملف وتحديث الأصناف");
+      importExcelInput.value = "";
+    } catch (err) {
+      console.error("import error:", err);
+      alert("فشل استيراد الملف إلى Firestore.");
+    }
+  };
+  reader.readAsBinaryString(file);
+});
+
+function showImportMessage(text) {
+  const msg = document.createElement("div");
+  msg.textContent = text;
+  msg.style = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #28a745;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    z-index: 9999;
+  `;
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 3000);
+}
+
+// ================= تصدير Excel (يسحب من Firestore) =================
+document.getElementById("exportExcelBtn").addEventListener("click", async function () {
+  try {
+    const items = await fetchItems();
+    if (items.length === 0) {
+      alert("⚠️ لا توجد بيانات في الجدول للتصدير");
+      return;
+    }
+    // نُحول لنسخة بدون id كي يُصدر بشكل مناسب
+    const data = items.map(it => ({ name: it.name, code: it.code, unit: it.unit, cost: it.cost, price: it.price }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Items");
+    XLSX.writeFile(workbook, "items.xlsx");
+    showExportMessage("✔️ تم تصدير الجدول إلى Excel");
+  } catch (err) {
+    console.error("export error:", err);
+    alert("حدث خطأ أثناء التصدير من Firestore.");
+  }
+});
+
+function showExportMessage(text) {
+  const msg = document.createElement("div");
+  msg.textContent = text;
+  msg.style = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #007bff;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    z-index: 9999;
+  `;
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 3000);
+}
+</script>
+
+</body>
+</html>
