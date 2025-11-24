@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title> نظام   سلتي 🛒</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal&display=swap');
+body{font-family:"Tajawal",sans-serif;direction:rtl;background:#f0f8ff;margin:0;padding:0;}
+h2,h3{text-align:center;color:#0d6efd;margin:15px 0;}
+.container{width:95%;max-width:1200px;margin:auto;padding:15px;}
+input, button{padding:10px;border-radius:8px;border:1px solid #ccc;font-size:16px;}
+button{cursor:pointer;background:#0d6efd;color:#fff;border:none;}
+button:hover{background:#084298;}
+table{width:100%;border-collapse:collapse;margin-top:15px;font-size:14px;}
+th,td{border:1px solid #ccc;padding:8px;text-align:center;white-space:normal;overflow-wrap:break-word;}
+th{background:#0d6efd;color:#fff;cursor:pointer;}
+tr:nth-child(even){background:#e7f1ff;}
+.table-container{overflow-x:auto;width:100%;}
+#reader,#readerCart{width:100%;margin:10px auto;display:none;}
+.autocomplete{border:1px solid #ccc;border-radius:8px;max-height:150px;overflow-y:auto;background:#fff;position:absolute;z-index:1000;width:95%;}
+.autocomplete div{padding:8px;cursor:pointer;}
+.autocomplete div:hover{background:#d0e4ff;}
+#cartMessage{color:#155724;background:#d4edda;padding:10px;margin-top:10px;border-radius:8px;display:none;text-align:center;}
+
+header {
+  background: #007bff;
+  color: white;
+  padding: 15px;
+  text-align: center;
+}
+nav {
+  background: #e9ecef;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px;
+}
+nav button {
+  padding: 10px 20px;
+  border: none;
+  background: #007bff;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+nav button:hover {
+  background: #0056b3;
+}
+.content {
+  padding: 20px;
+}
+.form-section {
+  display: none;
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 5px #ccc;
+  margin-top: 20px;
+}
+label {
+  display: block;
+  margin-top: 10px;
+}
+input, select {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+/* ===== تحسين مظهر الجدول للهواتف ===== */
+.table-container {
+  overflow-x: auto;
+  width: 100%;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 5px;
+}
+td, th {
+  padding: 5px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+/* التفاف النص */
+td {
+  white-space: normal;
+  word-wrap: break-word;
+}
+/* ضبط عرض الأعمدة */
+#cartTable td:nth-child(1) { width: 200px; }
+#cartTable td:nth-child(2) { width: 150px; word-break: break-all; }
+#cartTable th:nth-child(3), #cartTable td:nth-child(3) { width: 80px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<header>
+  <h2>👨‍💻 المهندس/عرفات احمد الدبواني</h2>
+</header>
+
+<nav>
+  <button onclick="showSection('ahmad')">سلتي 🛒</button>
+</nav>
+
+<div class="container">
+
+  <!-- السلة -->
+  <section id="ahmad" class="form-section">
+    <div style="position:relative; display:flex; gap:10px; align-items:center;">
+      <input type="text" id="searchCart" placeholder="ابحث عن الصنف بالاسم أو الرمز" style="flex:1;">
+      <button type="button" id="scanCartBtn">📷 مسح رمز</button>
+      <div id="autocompleteCart" class="autocomplete" style="right:0;"></div>
+    </div>
+
+    <div id="readerCart" style="margin-top:10px; display:none;"></div>
+
+    <div id="itemInfoCart" style="display:none;margin-top:10px;">
+      <p>اسم الصنف: <span id="infoNameCart"></span></p>
+      <p>رمز الصنف: <span id="infoCodeCart"></span></p>
+      <p>سعر البيع: <span id="infoPriceCart"></span></p>
+      <label>الكمية:</label>
+      <input type="number" id="itemQtyCart" value="1" min="1" style="width:120px;">
+      <button id="addCartBtn" style="margin-top:6px;">➕ إضافة للعربة</button>
+    </div>
+
+    <button id="newCartBtn" style="background:#28a745;margin-top:10px;">🆕 سلة جديدة</button>
+    <div id="cartMessage"></div>
+
+    <div class="table-container" style="margin-top:10px;">
+      <table id="cartTable">
+        <thead>
+          <tr>
+            <th>اسم الصنف</th>
+            <th>رمز الصنف</th>
+            <th>السعر</th>
+            <th>الكمية</th>
+            <th>الإجمالي</th>
+            <th>حذف</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="summary" style="margin-top:10px;">عدد القطع: 0 | الإجمالي: 0</div>
+  </section>
+
+</div>
+
+<script>
+// ===== دالة تنسيق الأرقام بإضافة فواصل الآلاف (مثال: 1000 -> "1,000") =====
+function formatWithThousandsSeparator(value) {
+  // نحافظ على الأرقام داخل الكود كأرقام لكن نعرضها كسلاسل بمحدد آلاف
+  const num = Number(value);
+  if (!isFinite(num)) return String(value);
+  const parts = String(num).split('.');
+  const intPart = parts[0];
+  const decPart = parts[1] ? '.' + parts[1] : '';
+  const intWithSep = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return intWithSep + decPart;
+}
+
+// ================= ماسح QR للسلة =================
+let isScanningCart = false;
+const readerCart = document.getElementById("readerCart");
+const scanCartBtn = document.getElementById("scanCartBtn");
+const qrCart = new Html5Qrcode("readerCart");
+
+scanCartBtn.onclick = async () => {
+  if (!isScanningCart) {
+    try {
+      const cams = await Html5Qrcode.getCameras();
+      if (!cams.length) return alert("لم يتم العثور على كاميرا");
+      let cam = cams.find(c => c.label && c.label.toLowerCase().includes("back"))?.id || cams[0].id;
+      readerCart.style.display = "block";
+      await qrCart.start(cam, { fps: 15, qrbox: { width: 200, height: 120 } },
+        (decoded) => {
+          try {
+            const itemsList = JSON.parse(localStorage.getItem("itemsList") || "[]");
+            const item = itemsList.find(i => String(i.code) === String(decoded));
+            if (item) showCartItem(item);
+            else alert("لم يتم العثور على الصنف بهذا الرمز");
+          } catch (e) {
+            alert("خطأ في قراءة البيانات: " + e.message);
+          }
+          qrCart.stop().catch(() => {});
+          readerCart.style.display = "none";
+          scanCartBtn.textContent = "📷 مسح";
+          isScanningCart = false;
+        },
+        (error) => {}
+      );
+      isScanningCart = true;
+      scanCartBtn.textContent = "⏹️ إيقاف";
+    } catch (e) {
+      alert("خطأ في تهيئة الكاميرا: " + (e.message || e));
+      readerCart.style.display = "none";
+    }
+  } else {
+    qrCart.stop().catch(() => {});
+    readerCart.style.display = "none";
+    scanCartBtn.textContent = "📷 مسح";
+    isScanningCart = false;
+  }
+};
+
+// ================ عرض الأقسام =================
+function showSection(id) {
+  document.querySelectorAll('.form-section').forEach(s => s.style.display = 'none');
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'block';
+}
+
+// ================= السلة =================
+let cart = [];
+const searchCart = document.getElementById("searchCart");
+const autocompleteCart = document.getElementById("autocompleteCart");
+const itemInfoCart = document.getElementById("itemInfoCart");
+const infoNameCart = document.getElementById("infoNameCart");
+const infoCodeCart = document.getElementById("infoCodeCart");
+const infoPriceCart = document.getElementById("infoPriceCart");
+const itemQtyCart = document.getElementById("itemQtyCart");
+const addCartBtn = document.getElementById("addCartBtn");
+const cartTableBody = document.querySelector("#cartTable tbody");
+const summary = document.getElementById("summary");
+const newCartBtn = document.getElementById("newCartBtn");
+const cartMessage = document.getElementById("cartMessage");
+let selectedCartItem = null;
+
+function showCartItem(item) {
+  selectedCartItem = item;
+  itemInfoCart.style.display = "block";
+  infoNameCart.textContent = item.name || "";
+  infoCodeCart.textContent = item.code || "";
+  // عرض السعر منسقًا بفواصل الآلاف (إذا كان موجودًا)
+  infoPriceCart.textContent = (item.price != null) ? formatWithThousandsSeparator(item.price) : "";
+  itemQtyCart.value = 1;
+}
+
+searchCart.addEventListener("input", () => {
+  const val = (searchCart.value || "").toLowerCase().trim();
+  autocompleteCart.innerHTML = "";
+  if (!val) return;
+  const itemsList = JSON.parse(localStorage.getItem("itemsList") || "[]");
+  itemsList.filter(i => (i.name || "").toLowerCase().includes(val) || String(i.code).includes(val))
+  .forEach(i => {
+    const div = document.createElement("div");
+    div.textContent = `${i.name} (${i.code})`;
+    div.onclick = () => {
+      showCartItem(i);
+      autocompleteCart.innerHTML = "";
+      searchCart.value = "";
+    };
+    autocompleteCart.appendChild(div);
+  });
+});
+
+addCartBtn.addEventListener("click", () => {
+  if (!selectedCartItem) return alert("اختر صنفاً أولاً");
+  const qty = Number(itemQtyCart.value) || 0; if (qty < 1) return alert("الكمية يجب أن تكون 1 على الأقل");
+  // تأكد من أن السعر قيمة رقمية
+  const price = Number(selectedCartItem.price) || 0;
+  const exists = cart.find(c => String(c.code) === String(selectedCartItem.code));
+  if (exists) {
+    exists.qty += qty;
+  } else {
+    cart.push({ ...selectedCartItem, qty, price });
+  }
+  updateCartTable();
+  hideCartItem();
+});
+
+function updateCartTable() {
+  cartTableBody.innerHTML = "";
+  let totalQty = 0, totalPrice = 0;
+  cart.forEach((c, i) => {
+    const price = Number(c.price) || 0;
+    const subtotal = price * (Number(c.qty) || 0);
+    totalQty += Number(c.qty) || 0;
+    totalPrice += subtotal;
+    const row = document.createElement("tr");
+    row.innerHTML = `<td>${c.name || ""}</td>
+      <td>${c.code || ""}</td>
+      <td>${formatWithThousandsSeparator(price)}</td>
+      <td><input type="number" value="${c.qty}" min="1" onchange="changeQty(${i},this.value)" style="width:70px;"></td>
+      <td>${formatWithThousandsSeparator(subtotal)}</td>
+      <td><button onclick="deleteCartItem(${i})" style="background:#dc3545;">🗑️</button></td>`;
+    cartTableBody.appendChild(row);
+  });
+  summary.textContent = `عدد القطع: ${totalQty} | الإجمالي: ${formatWithThousandsSeparator(totalPrice)}`;
+}
+
+function changeQty(i, v) { v = Number(v); if (v < 1) return; cart[i].qty = v; updateCartTable(); }
+function deleteCartItem(i) { cart.splice(i, 1); updateCartTable(); }
+
+function hideCartItem() {
+  selectedCartItem = null;
+  itemInfoCart.style.display = "none";
+  infoNameCart.textContent = "";
+  infoCodeCart.textContent = "";
+  infoPriceCart.textContent = "";
+  itemQtyCart.value = 1;
+}
+
+newCartBtn.addEventListener("click", () => {
+  if (confirm("هل تريد إنشاء سلة جديدة؟")) {
+    cart = []; updateCartTable();
+    cartMessage.style.display = "block";
+    cartMessage.textContent = "✅ تم إنشاء سلة جديدة!";
+    setTimeout(() => { cartMessage.style.display = "none"; }, 3000);
+  }
+});
+
+// عرض القسم الافتراضي عند التحميل
+window.addEventListener('DOMContentLoaded', () => {
+  showSection('ahmad');
+});
+</script>
+</body>
+</html>
