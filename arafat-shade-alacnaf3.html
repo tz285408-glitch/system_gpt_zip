@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>نظام الأصناف والسلة - محسن (Firestore - real-time)</title>
+
+<!-- مكتبات خارجية -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal&display=swap');
+body{font-family:"Tajawal",sans-serif;direction:rtl;background:#f0f8ff;margin:0;padding:0;}
+h2,h3{text-align:center;color:#0d6efd;margin:15px 0;}
+.container{width:95%;max-width:1200px;margin:auto;padding:15px;}
+input, button{padding:10px;border-radius:8px;border:1px solid #ccc;font-size:16px;}
+button{cursor:pointer;background:#0d6efd;color:#fff;border:none;}
+button:hover{background:#084298;}
+
+table{width:100%;border-collapse:collapse;margin-top:15px;font-size:14px;}
+th,td{border:1px solid #ccc;padding:8px;text-align:center;white-space:normal;overflow-wrap:break-word;}
+th{background:#0d6efd;color:#fff;cursor:pointer;}
+
+tr:nth-child(even){background:#e7f1ff;}
+.table-container{overflow-x:auto;width:100%;}
+#reader,#readerCart{width:100%;margin:10px auto;display:none;}
+.autocomplete{border:1px solid #ccc;border-radius:8px;max-height:150px;overflow-y:auto;background:#fff;position:absolute;z-index:1000;width:95%;}
+.autocomplete div{padding:8px;cursor:pointer;}
+.autocomplete div:hover{background:#d0e4ff;}
+#cartMessage{color:#155724;background:#d4edda;padding:10px;margin-top:10px;border-radius:8px;display:none;text-align:center;}
+
+header {
+  background: #007bff;
+  color: white;
+  padding: 15px;
+  text-align: center;
+}
+nav {
+  background: #e9ecef;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px;
+}
+nav button {
+  padding: 10px 20px;
+  border: none;
+  background: #007bff;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+nav button:hover {
+  background: #0056b3;
+}
+.content {
+  padding: 20px;
+}
+.form-section {
+  display: none;
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 5px #ccc;
+  margin-top: 20px;
+}
+label {
+  display: block;
+  margin-top: 10px;
+}
+input, select {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+</style>
+</head>
+<body>
+<nav>
+  <button onclick="showSection('ahmad2')">دخول🛸</button>
+</nav>
+  
+<div class="clasarafat">
+<section id="ahmad2" class="form-section">
+<h2>📦 إدارة الأصناف 🛒 السلة</h2>
+<nav>
+  <button onclick="showSection('arafat')">إدارة الأصناف</button>
+</nav>
+</section>
+</div>
+
+<div class="container">
+<section id="arafat" class="form-section">
+<h3>إدارة الأصناف</h3>
+<div id="reader"></div>
+
+<form id="itemForm">
+<div style="margin-top:5px; display:flex; gap:10px; flex-wrap:wrap;">
+  <div style="flex:1 1 240px; min-width:200px;">
+    <label>اسم الصنف:</label>
+    <input type="text" id="itemName" placeholder="اكتب اسم الصنف" required>
+  </div>
+
+<div id="itemMessage" style="
+  display:none;
+  color:#856404;
+  background:#fff3cd;
+  padding:15px 20px;
+  margin:50px auto;
+  border-radius:10px;
+  text-align:center;
+  font-size:24px;
+  font-weight:bold;
+  width:fit-content;
+  box-shadow: 0 0 10px rgba(0,0,3,0.2);
+">
+</div>
+  
+  <div style="flex:1 1 240px; min-width:200px;">
+    <label>رمز الصنف:</label>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="itemCode" placeholder="امسح أو اكتب الرمز" required style="flex:1;">
+      <button type="button" id="scanItemBtn">📷 مسح رمز الصنف</button>
+    </div>
+  </div>
+<div style="display:flex; flex-direction:column; gap:15px;">
+
+  <div>
+    <label>الوحدة:</label>
+    <input type="text" id="itemUnit" placeholder="الوحدة مثل: حبة، كيلو، لتر"
+           required style="width:100%; margin-top:5px;">
+  </div>
+
+  <div style="display:flex; gap:10px;">
+    <div style="flex:1;">
+      <label>سعر الشراء:</label>
+      <input type="text" inputmode="decimal" id="itemCost" placeholder="سعر الشراء"
+             style="width:100%; margin-top:5px;">
+    </div>
+
+    <div style="flex:1;">
+      <label>سعر البيع:</label>
+      <input type="text" input
