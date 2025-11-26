@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الشعار التفاعلي</title>
+<style>
+body{margin:0;font-family:sans-serif;direction:rtl;text-align:center;background:#f0f4f8}
+.logo{position:fixed;top:0;width:100%;background:linear-gradient(to left,#0078d7,#00b4d8);color:#fff;
+padding:15px;font-size:22px;display:flex;align-items:center;justify-content:center;gap:10px;z-index:1000}
+.logo img{width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid #fff}
+.content{margin-top:100px}
+input,button{padding:8px;border-radius:6px;border:1px solid #ccc;margin:5px}
+button{background:#0078d7;color:#fff;border:none;cursor:pointer}
+button:hover{background:#005fa3}
+</style>
+</head>
+<body>
+
+<div class="logo">
+  <img id="logoImg" src="https://via.placeholder.com/50" alt="الشعار">
+  <span id="logoTxt">🏢 شعار الشركة</span>
+</div>
+
+<div class="content">
+  <h3>إعدادات الشعار</h3>
+  <input id="nameIn" type="text" placeholder="أدخل اسم جديد للشعار">
+  <button onclick="setName()">تغيير الاسم</button><br>
+  <input id="imgIn" type="file" accept="image/*">
+  <button onclick="setImg()">تغيير الصورة</button>
+</div>
+
+<script>
+const nameEl=logoTxt,imgEl=logoImg;
+// تحميل البيانات المحفوظة
+onload=()=>{
+  if(localStorage.name)nameEl.textContent=localStorage.name;
+  if(localStorage.img)imgEl.src=localStorage.img;
+}
+// تغيير الاسم وتخزينه
+function setName(){
+  const v=nameIn.value.trim();
+  if(v){nameEl.textContent=v;localStorage.name=v;nameIn.value='';}
+}
+// تغيير الصورة وتخزينها
+function setImg(){
+  const f=imgIn.files[0];
+  if(f){
+    const r=new FileReader();
+    r.onload=e=>{imgEl.src=e.target.result;localStorage.img=e.target.result;}
+    r.readAsDataURL(f);
+    imgIn.value='';
+  }
+}
+</script>
+
+</body>
+</html>
+
