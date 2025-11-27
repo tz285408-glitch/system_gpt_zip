@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>نظام الأصناف - محلي (مصفوفات داخل الكود)</title>
+
+<!-- QR, Excel, PDF libraries (احتفظت بها كما في ملفك) -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal&display=swap');
+body{font-family:"Tajawal",sans-serif;direction:rtl;background:#f0f8ff;margin:0;padding:0;}
+h2,h3{text-align:center;color:#0d6efd;margin:15px 0;}
+.container{width:95%;max-width:1200px;margin:auto;padding:15px;}
+input, button{padding:10px;border-radius:8px;border:1px solid #ccc;font-size:16px;}
+button{cursor:pointer;background:#0d6efd;color:#fff;border:none;}
+button:hover{background:#084298;}
+
+table{width:100%;border-collapse:collapse;margin-top:15px;font-size:14px;}
+th,td{border:1px solid #ccc;padding:8px;text-align:center;white-space:normal;overflow-wrap:break-word;}
+th{background:#0d6efd;color:#fff;cursor:pointer;}
+
+tr:nth-child(even){background:#e7f1ff;}
+.table-container{overflow-x:auto;width:100%;}
+#reader,#readerCart{width:100%;margin:10px auto;display:none;}
+.autocomplete{border:1px solid #ccc;border-radius:8px;max-height:150px;overflow-y:auto;background:#fff;position:absolute;z-index:1000;width:95%;}
+.autocomplete div{padding:8px;cursor:pointer;}
+.autocomplete div:hover{background:#d0e4ff;}
+#cartMessage{color:#155724;background:#d4edda;padding:10px;margin-top:10px;border-radius:8px;display:none;text-align:center;}
+
+header {
+  background: #007bff;
+  color: white;
+  padding: 15px;
+  text-align: center;
+}
+nav {
+  background: #e9ecef;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px;
+}
+nav button {
+  padding: 10px 20px;
+  border: none;
+  background: #007bff;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+nav button:hover {
+  background: #0056b3;
+}
+.content {
+  padding: 20px;
+}
+.form-section {
+  display: none;
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 5px #ccc;
+  margin-top: 20px;
+}
+label {
+  display: block;
+  margin-top: 10px;
+}
+input, select {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+#syncStatus {
+  font-weight: bold;
+  text-align: center;
+  margin: 8px 0;
+}
+button.small { padding: 8px 10px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<header role="banner">
+  <h1 style="margin:0; font-size:20px;">نظام الأصناف - تخزين محلي في مصفوفات</h1>
+</header>
+
+<nav role="navigation" aria-label="قائمة التنقل">
+  <button type="button" onclick="showSection('arafat')">إدارة الأصناف</button>
+</nav>
+
+<main class="container" role="main">
+  <section id="arafat" class="form-section" aria-hidden="true">
+    <h3>إدارة الأصناف (محلي - مصفوفات داخل الكود)</h3>
+
+    <div id="reader" aria-hidden="true"></div>
+
+    <form id="itemForm" aria-label="نموذج إضافة صنف">
+      <div style="margin-top:5px; display:flex; gap:10px; flex-wrap:wrap;">
+        <div style="flex:1 1 240px; min-width:200px;">
+          <label for="itemName">اسم الصنف:</label>
+          <input type="text" id="itemName" placeholder="اكتب اسم الصنف" required aria-required="true">
+        </div>
+
+        <div style="flex:1 1 240px; min-width:200px;">
+          <label for="itemCode">رمز الصنف:</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="itemCode" placeholder="امسح أو اكتب الرمز" required style="flex:1;">
+            <button type="button" id="scanItemBtn" class="small" aria-pressed="false">📷 مسح</button>
+          </div>
+        </div>
+
+        <div style="flex:1 1 240px; min-width:200px;">
+          <label for="itemUnit">الوحدة:</label>
+          <input type="text" id="itemUnit" placeholder="الوحدة مثل: حبة، كيلو، لتر" required>
+        </div>
+
+        <div style="display:flex; gap:10px; width:100%;">
+          <div style="flex:1;">
+            <label for="itemCost">سعر الشراء:</label>
+            <input type="text" inputmode="decimal" id="itemCost" placeholder="سعر الشراء">
+          </div>
+
+          <div style="flex:1;">
+            <label for="itemPrice">سعر البيع:</label>
+            <input type="text" inputmode="decimal" id="itemPrice" placeholder="سعر البيع">
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:10px; width:100%;">
+          <button type="submit" id="saveBtn">💾 حفظ الصنف</button>
+          <button type="button" id="cancelItemBtn" style="background:#dc3545;">❌ إلغاء</button>
+        </div>
+
+      </div>
+    </form>
+
+    <div id="itemMessage" role="status" aria-live="polite" style="
+      display:none;
+      color:#856404;
+      background:#fff3cd;
+      padding:15px 20px;
+      margin:20px auto;
+      border-radius:10px;
+      text-align:center;
+      font-size:18px;
+      font-weight:bold;
+      width:fit-content;
+      box-shadow: 0 0 10px rgba(0,0,3,0.2);
+    "></div>
+
+    <div id="syncStatus">مخزن محلي فقط (لا يوجد مزامنة سحابية)</div>
+
+    <div style="margin-top:5px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <select id="sortSelect" aria-label="فرز الأصناف">
+        <option value="">-- فرز حسب --</option>
+        <option value="name-asc">اسم الصنف تصاعدي</option>
+        <option value="name-desc">اسم الصنف تنازلي</option>
+        <option value="code-asc">رمز الصنف تصاعدي</option>
+        <option value="code-desc">رمز الصنف تنازلي</option>
+        <option value="cost-asc">أقل سعر شراء</option>
+        <option value="cost-desc">أعلى سعر شراء</option>
+        <option value="price-asc">أقل سعر بيع</option>
+        <option value="price-desc">أعلى سعر بيع</option>
+      </select>
+      <button id="exportExcelBtn" class="small">📤 Excel</button>
+      <input type="file" id="importExcel" accept=".xlsx,.xls" aria-label="استيراد ملف Excel">
+      <input type="text" id="searchInput" placeholder="🔍 ابحث عن أي صنف" style="flex:1;">
+    </div>
+
+    <div id="itemsCount" style="text-align:center; font-weight:bold; margin-bottom:10px;">
+      عدد الأصناف: 0
+    </div>
+
+    <div class="table-container" role="region" aria-label="قائمة الأصناف">
+      <table id="itemsTable" role="table">
+        <thead>
+          <tr>
+            <th scope="col">اسم الصنف</th>
+            <th scope="col">رمز الصنف</th>
+            <th scope="col">الوحدة</th>
+            <th scope="col">سعر الشراء</th>
+            <th scope="col">سعر البيع</th>
+            <th scope="col">الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <hr>
+  </section>
+</main>
+
+<div id="saveMessage" role="status" aria-live="polite" style="
+  display:none;
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  background:#d4edda;
+  color:#155724;
+  border:2px solid #28a745;
+  padding:20px 40px;
+  font-size:24px;
+  font-weight:bold;
+  border-radius:10px;
+  box-shadow:0 0 15px rgba(0,0,0,0.2);
+  z-index:9999;
+  text-align:center;
+">
+  تم الحفظ ✅
+</div>
+
+<script>
+/*
+  هذا الملف يعمل بشكل محلي: الأصناف محفوظة في مصفوفة داخل الكود (itemsCache)
+  وتُخزن نسخة احتياطية في localStorage كي تبقى عبر إعادة التحميل.
+  بالإضافة إلى ذلك تُبنى مصفوفات منفصلة لكل حقل (namesArr, codesArr, unitsArr, costsArr, pricesArr)
+  لتلبية مطلب "تكون المتغيرات داخل الكود كمصفوفات".
+*/
+
+/* ====== عناصر DOM ====== */
+const itemsTableBody = document.querySelector("#itemsTable tbody");
+const itemForm = document.getElementById("itemForm");
+const itemName = document.getElementById("itemName");
+const itemCode = document.getElementById("itemCode");
+const itemUnit = document.getElementById("itemUnit");
+const itemCost = document.getElementById("itemCost");
+const itemPrice = document.getElementById("itemPrice");
+const itemMessage = document.getElementById("itemMessage");
+const syncStatus = document.getElementById("syncStatus");
+const importExcelInput = document.getElementById("importExcel");
+const scanItemBtn = document.getElementById("scanItemBtn");
+
+/* ====== المصفوفات داخل "الكود" (ذاكرة + نستخدم localStorage للحفظ عبر صفحة) ====== */
+let itemsCache = []; // مصفوفة كائنات: [{name, code, unit, cost, price}]
+let namesArr = [];
+let codesArr = [];
+let unitsArr = [];
+let costsArr = [];
+let pricesArr = [];
+
+/* مؤشر التعديل: null => إضافة جديد، رقم => تعديل عنصر بحسب الفهرس */
+let editingIndex = null;
+
+/* ====== وظائف مساعدة ====== */
+function stripCommas(val) {
+  if (val === undefined || val === null) return "";
+  return String(val).replace(/,/g, "").trim();
+}
+function formatWithCommas(val) {
+  if (val === undefined || val === null || val === "") return "";
+  const s = String(val).replace(/,/g, "");
+  const n = Number(s);
+  if (isNaN(n)) return String(val);
+  return n.toLocaleString();
+}
+function escapeHtml(text) {
+  if (!text && text !== 0) return "";
+  return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+/* ====== المزامنة بين itemsCache والمصفوفات المنفصلة (يوفر "البيانات كمتغيرات في الكود") ====== */
+function syncParallelArrays() {
+  namesArr = itemsCache.map(i => i.name || "");
+  codesArr = itemsCache.map(i => i.code || "");
+  unitsArr = itemsCache.map(i => i.unit || "");
+  costsArr = itemsCache.map(i => i.cost || "");
+  pricesArr = itemsCache.map(i => i.price || "");
+  // نُبقي نسخة في localStorage أيضاً
+  try {
+    localStorage.setItem('itemsList', JSON.stringify(itemsCache));
+    localStorage.setItem('itemsParallel', JSON.stringify({
+      namesArr, codesArr, unitsArr, costsArr, pricesArr
+    }));
+  } catch (e) {
+    console.warn('localStorage save failed', e);
+  }
+}
+
+/* ====== تحميل من التخزين المحلي أو إنشاء مصفوفة فارغة (أو عينات إن أردت) ====== */
+function loadItemsFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem('itemsList');
+    if (raw) {
+      itemsCache = JSON.parse(raw);
+    } else {
+      // إن أردت أمثلة مبدئية يمكنك تعديل هذا الجزء ليحوي عناصر افتراضية
+      itemsCache = [];
+    }
+  } catch (e) {
+    console.warn('local load failed', e);
+    itemsCache = [];
+  }
+  syncParallelArrays();
+  renderItemsFromCache();
+}
+
+/* ====== عرض البيانات في الجدول ====== */
+function renderItemsFromCache() {
+  const sortValue = document.getElementById("sortSelect").value;
+  let items = [...itemsCache];
+  if (sortValue) {
+    const [field, order] = sortValue.split("-");
+    items.sort((a,b) => {
+      if (field === "name" || field === "code") {
+        return order === "asc" ? (a[field]||"").localeCompare(b[field]||"") : (b[field]||"").localeCompare(a[field]||"");
+      }
+      const an = Number(stripCommas(a[field] || 0));
+      const bn = Number(stripCommas(b[field] || 0));
+      return order === "asc" ? an - bn : bn - an;
+    });
+  }
+
+  itemsTableBody.innerHTML = "";
+  items.forEach((it, i) => {
+    const costDisplay = formatWithCommas(it.cost);
+    const priceDisplay = formatWithCommas(it.price);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.code)}</td><td>${escapeHtml(it.unit)}</td><td>${costDisplay||''}</td><td>${priceDisplay||''}</td>
+      <td><div style="display:flex; gap:4px; justify-content:center;">
+      <button type="button" onclick="editItem(${i})">✏️ تعديل</button>
+      <button type="button" onclick="deleteItem(${i})" style="background:#dc3545;">🗑️ حذف</button>
+      </div></td>`;
+    itemsTableBody.appendChild(tr);
+  });
+  updateItemsCount();
+}
+
+/* ====== تحديث العداد ====== */
+function updateItemsCount() {
+  const n = itemsCache.length;
+  document.getElementById("itemsCount").textContent = `عدد الأصناف: ${n}`;
+}
+
+/* ====== إضافة / تعديل (يعمل على المصفوفات داخل الكود) ====== */
+itemForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  if (!itemName.value.trim() || !itemCode.value.trim() || !itemUnit.value.trim()) {
+    alert('الرجاء تعبئة الحقول المطلوبة: اسم الصنف، رمز الصنف، الوحدة');
+    return;
+  }
+
+  const name = itemName.value.trim();
+  const code = itemCode.value.trim();
+  const unit = itemUnit.value.trim();
+  const cost = stripCommas(itemCost.value);
+  const price = stripCommas(itemPrice.value);
+
+  const newItem = { name, code, unit, cost, price };
+
+  // إذا في وضع تعديل
+  if (editingIndex !== null && editingIndex >= 0 && editingIndex < itemsCache.length) {
+    // تحقق إن كان الرمز يتعارض مع صنف آخر
+    const conflictIndex = itemsCache.findIndex((it, idx) => it.code === code && idx !== editingIndex);
+    if (conflictIndex !== -1) {
+      if (!confirm('رمز الصنف هذا مستخدم بواسطة عنصر آخر. هل تريد استبداله؟')) {
+        return;
+      }
+      // سنحذف العنصر المتعارض ثم نحدث الحالي
+      itemsCache.splice(conflictIndex, 1);
+      // إذا كان conflictIndex < editingIndex فإن الفهرس يتغير
+      if (conflictIndex < editingIndex) editingIndex--;
+    }
+    itemsCache[editingIndex] = newItem;
+    editingIndex = null;
+  } else {
+    // وضع إضافة جديد: تحقق إن كان الرمز موجود مسبقاً
+    const existing = itemsCache.findIndex(it => it.code === code);
+    if (existing !== -1) {
+      if (!confirm('رمز الصنف موجود مسبقًا. هل تريد تحديث الصنف الموجود؟')) return;
+      itemsCache[existing] = newItem;
+    } else {
+      itemsCache.push(newItem);
+    }
+  }
+
+  syncParallelArrays();
+  renderItemsFromCache();
+  itemForm.reset();
+  document.getElementById("saveMessage").style.display = 'block';
+  setTimeout(()=> document.getElementById("saveMessage").style.display = 'none', 1200);
+});
+
+/* ====== تعديل / حذف عناصر من المصفوفة المحلية ====== */
+window.editItem = function(i) {
+  const it = itemsCache[i];
+  if (!it) return;
+  itemName.value = it.name || "";
+  itemCode.value = it.code || "";
+  itemUnit.value = it.unit || "";
+  itemCost.value = formatWithCommas(it.cost || "");
+  itemPrice.value = formatWithCommas(it.price || "");
+  editingIndex = i;
+  // Scroll to form for UX
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.deleteItem = function(i) {
+  const it = itemsCache[i];
+  if (!it) return;
+  if (!confirm('هل تريد حذف هذا الصنف نهائياً؟')) return;
+  itemsCache.splice(i, 1);
+  syncParallelArrays();
+  renderItemsFromCache();
+};
+
+/* ====== QR Scanner (يعبي الحقل فقط) ====== */
+let isScanning = false;
+const qrReaderEl = document.getElementById("reader");
+let qrScanner = null;
+async function ensureQrScanner() {
+  if (!qrScanner) qrScanner = new Html5Qrcode("reader");
+  return qrScanner;
+}
+scanItemBtn.onclick = async () => {
+  try {
+    if (!isScanning) {
+      const scanner = await ensureQrScanner();
+      let cams = [];
+      try { cams = await Html5Qrcode.getCameras(); } catch (err) { cams = []; }
+      if (!cams.length) return alert("لم يتم العثور على كاميرا");
+      let cam = cams.find(c => c.label && c.label.toLowerCase().includes("back"))?.id || cams[0].id;
+      qrReaderEl.style.display = "block";
+      scanItemBtn.textContent = "⏹️ إيقاف";
+      scanItemBtn.setAttribute("aria-pressed", "true");
+      isScanning = true;
+
+      await scanner.start(cam, { fps: 15, qrbox: { width: 280, height: 160 } },
+        async (decoded) => {
+          // ضع القيمة في حقل الرمز وتوقف
+          itemCode.value = String(decoded);
+          stopScanner().catch(()=>{});
+        },
+        (err) => { /* تجاهل أخطاء القراءة */ }
+      );
+    } else {
+      await stopScanner();
+    }
+  } catch (err) {
+    console.error(err);
+    alert('خطأ في تشغيل الماسح: ' + (err && err.message || err));
+    try { await stopScanner(); } catch(e){}
+  }
+};
+async function stopScanner() {
+  if (!qrScanner) return;
+  try { await qrScanner.stop(); } catch(e){}
+  qrReaderEl.style.display = "none";
+  scanItemBtn.textContent = "📷 مسح";
+  scanItemBtn.setAttribute("aria-pressed", "false");
+  isScanning = false;
+}
+
+/* ====== استيراد Excel ====== */
+function getCellValue(obj, keys) {
+  for (let k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null) return String(obj[k]).trim();
+  }
+  return "";
+}
+importExcelInput.addEventListener("change", function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(evt) {
+    let workbook;
+    try { workbook = XLSX.read(evt.target.result, { type: "binary" }); }
+    catch { workbook = XLSX.read(new Uint8Array(evt.target.result), { type: "array" }); }
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet) return alert("❌ الملف غير صالح");
+    let rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (!rows.length) return alert("❌ ملف Excel فارغ");
+
+    const mapped = rows.map(row => {
+      if (Array.isArray(row)) {
+        return {
+          name: String(row[0] || "").trim(),
+          code: String(row[1] || "").trim(),
+          unit: String(row[2] || "").trim(),
+          cost: String(row[3] || "").trim(),
+          price: String(row[4] || "").trim(),
+        };
+      } else {
+        return {
+          name: getCellValue(row, ["name","اسم","اسم الصنف"]),
+          code: getCellValue(row, ["code","رمز","رمز الصنف"]),
+          unit: getCellValue(row, ["unit","الوحدة"]),
+          cost: getCellValue(row, ["cost","سعر الشراء"]),
+          price: getCellValue(row, ["price","سعر البيع"]),
+        };
+      }
+    }).filter(r => r.code);
+
+    // دمج مع البيانات المحلية: إذا الرمز موجود حدث، وإلا أضف
+    mapped.forEach(im => {
+      const idx = itemsCache.findIndex(it => it.code === im.code);
+      const newItem = { name: im.name, code: im.code, unit: im.unit, cost: im.cost, price: im.price };
+      if (idx !== -1) itemsCache[idx] = newItem;
+      else itemsCache.push(newItem);
+    });
+
+    syncParallelArrays();
+    renderItemsFromCache();
+    showImportMessage('✔️ تم استيراد الملف وتحديث الأصناف محلياً');
+    importExcelInput.value = '';
+  };
+  reader.readAsBinaryString(file);
+});
+
+function showImportMessage(text) {
+  const msg = document.createElement("div");
+  msg.textContent = text;
+  msg.style = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #28a745;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    z-index: 9999;
+  `;
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 3000);
+}
+
+/* ====== تصدير Excel ====== */
+document.getElementById("exportExcelBtn").addEventListener("click", function () {
+  if (!itemsCache.length) return alert('⚠️ لا توجد بيانات للتصدير');
+  const worksheet = XLSX.utils.json_to_sheet(itemsCache.map(i => ({ name: i.name, code: i.code, unit: i.unit, cost: i.cost, price: i.price })));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Items");
+  XLSX.writeFile(workbook, "items.xlsx");
+  showExportMessage("✔️ تم تصدير الجدول إلى Excel");
+});
+function showExportMessage(text) {
+  const msg = document.createElement("div");
+  msg.textContent = text;
+  msg.style = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #007bff;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    z-index: 9999;
+  `;
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 3000);
+}
+
+/* ====== وظائف واجهة مساعدة ====== */
+function clearItemFields() {
+  itemForm.reset();
+  editingIndex = null;
+  itemMessage.style.display = 'none';
+  [itemName, itemCode, itemUnit, itemCost, itemPrice].forEach(inp => inp.style.background = '');
+}
+document.getElementById("cancelItemBtn").addEventListener("click", clearItemFields);
+
+/* تلوين الحقول عند الكتابة */
+const fields = ["itemName","itemCode","itemUnit","itemCost","itemPrice"];
+fields.forEach(id => {
+  const input = document.getElementById(id);
+  input.addEventListener("input", () => {
+    if (input.value.trim() !== "") { input.style.background = "#d4edda"; input.style.border = "2px solid #28a745"; }
+    else { input.style.background = ""; input.style.border = ""; }
+  });
+});
+
+/* ربط البحث والفرز */
+document.getElementById("searchInput").addEventListener("input", ()=>{
+  const val = document.getElementById("searchInput").value.trim().toLowerCase();
+  document.querySelectorAll("#itemsTable tbody tr").forEach(r=>{
+    r.style.display = r.innerText.toLowerCase().includes(val) ? "" : "none";
+  });
+});
+document.getElementById("sortSelect").addEventListener("change", renderItemsFromCache);
+
+/* إبقاء القسم ظاهرًا */
+function showSection(id) {
+  document.querySelectorAll('.form-section').forEach(s => s.style.display='none');
+  const el = document.getElementById(id);
+  if (el) el.style.display='block';
+}
+showSection('arafat');
+
+/* حماية من الإغلاق أثناء المسح */
+window.addEventListener('beforeunload', (e) => {
+  if (isScanning) {
+    e.preventDefault(); e.returnValue = '';
+  }
+});
+
+/* ====== بَدْء: حمّل البيانات من التخزين المحلي وعرِضها ====== */
+loadItemsFromLocalStorage();
+</script>
+</body>
+</html>
+
