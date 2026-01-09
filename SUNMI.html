@@ -1,0 +1,1407 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>نظام مطاعم - POS (Sunmi)</title>
+<style>
+  body{font-family: "Noto Naskh Arabic", Tahoma, Arial; direction: rtl; padding:10px; background:#f6f8fa}
+  h1,h2{margin:8px 0}
+  .row{display:flex;gap:8px;align-items:center}
+  .col{flex:1}
+  input,select,button,textarea{padding:6px;border:1px solid #ccc;border-radius:4px}
+  table{width:100%;border-collapse:collapse;margin-top:8px;background:#fff}
+  th,td{padding:6px;border:1px solid #ddd;text-align:center}
+  th{background:#f0f0f0}
+  .card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:12px}
+  .small{font-size:12px;color:#555}
+  .actions button{margin-left:4px}
+  .error{color:#b00020}
+  .success{color:#006400}
+  .topbar{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+  .badge{background:#007bff;color:#fff;padding:4px 8px;border-radius:999px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  .hidden{display:none}
+  @media (max-width:800px){ .row{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<h1>نظام مطاعم - POS (Sunmi) — تطبيق ويب بسيط</h1>
+
+<div class="card topbar">
+  <div class="row col">
+    <label>وضع التكلفة: </label>
+    <select id="mode">
+      <option value="batch">دفعات (Batch / Each purchase keeps its cost)</option>
+      <option value="average">المتوسط المرجّح (Weighted Average)</option>
+    </select>
+    <span class="small">اختَر كيفية حساب تكلفة المخزون</span>
+  </div>
+  <div class="controls">
+    <button onclick="exportData()" title="تصدير البيانات">تصدير بيانات</button>
+    <button onclick="importData()" title="استيراد بيانات (يلصق JSON)">استيراد بيانات</button>
+    <button onclick="clearAll()" title="مسح بيانات التخزين المحلي">مسح كل البيانات</button>
+  </div>
+</div>
+
+<!-- إضافة صنف -->
+<div class="card">
+  <h2>1- إضافة صنف جديد</h2>
+  <div class="row">
+    <input id="item_name" placeholder="اسم الصنف" />
+    <input id="item_unit" placeholder="الوحدة (مثال: حبة، صحن)" />
+    <input id="item_cost" placeholder="التكلفة الافتراضية" type="number" step="0.01" />
+    <input id="item_price" placeholder="السعر" type="number" step="0.01" />
+    <input id="item_open_qty" placeholder="كمية أول المدة" type="number" step="1" />
+    <button onclick="addItem()">إضافة صنف</button>
+  </div>
+  <div class="small">ملاحظة: معرّف الصنف يُنشأ تلقائياً. تكلفة يدوية هنا تُستخدم كتكلفة افتراضية للشراء القادم (لا تغيّر دفعات سابقة).</div>
+</div>
+
+<!-- قائمة الأصناف -->
+<div class="card">
+  <h2>2- قائمة الأصناف</h2>
+  <div class="row">
+    <input id="search_items" placeholder="بحث باسم الصنف أو رقم التعريف" oninput="renderItems()" />
+    <select id="sort_items" onchange="renderItems()">
+      <option value="id.asc">رقم ↑</option>
+      <option value="id.desc">رقم ↓</option>
+      <option value="qty.desc">أعلى مخزون</option>
+      <option value="qty.asc">أقل مخزون</option>
+      <option value="cost.desc">أعلى تكلفة</option>
+      <option value="cost.asc">أقل تكلفة</option>
+      <option value="price.desc">أعلى سعر</option>
+      <option value="price.asc">أقل سعر</option>
+    </select>
+    <div class="small" id="items_count"></div>
+  </div>
+  <table id="items_table">
+    <thead>
+      <tr>
+        <th>ID</th><th>الاسم</th><th>الوحدة</th><th>التكلفة الحالية</th><th>السعر</th><th>فتح</th><th>مشتريات</th><th>مبيعات</th><th>المخزون(كمية)</th><th>إجمالي القيمة</th><th>إجراءات</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div class="small">ملاحظة: عند تعديل التكلفة اليدوية لا تُضرب فتح×التكلفة الجديدة — فتح يبقى بقيمته الأصلية من أجل حساب الأرباح بشكل صحيح.</div>
+</div>
+
+<!-- فاتورة مشتريات -->
+<div class="card">
+  <h2>3- إضافة فاتورة مشتريات</h2>
+  <div class="row">
+    <input id="pur_invoice_no" placeholder="رقم الفاتورة" />
+    <input id="pur_source" placeholder="المصدر / مورد" />
+    <input id="pur_date" type="date" />
+    <input id="pur_note" placeholder="ملاحظة" />
+  </div>
+  <h3>بنود الفاتورة</h3>
+  <div class="row">
+    <select id="pur_item_select"></select>
+    <input id="pur_item_unit" disabled placeholder="الوحدة" />
+    <input id="pur_item_cost" placeholder="التكلفة" type="number" step="0.01" />
+    <input id="pur_item_qty" placeholder="الكمية" type="number" step="1" />
+    <button onclick="addPurchaseLine()">أضف للصنف</button>
+  </div>
+  <table id="pur_lines_table">
+    <thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="row">
+    <div class="small">عدد الأصناف: <span id="pur_lines_count">0</span></div>
+    <div class="small">المجموع: <span id="pur_total">0.00</span></div>
+    <button onclick="savePurchase()">حفظ الفاتورة</button>
+  </div>
+</div>
+
+<!-- قائمة فواتير المشتريات -->
+<div class="card">
+  <h2>4- قائمة فواتير المشتريات</h2>
+  <div class="row">
+    من: <input id="pur_filter_from" type="date" /> إلى: <input id="pur_filter_to" type="date" />
+    <button onclick="renderPurchases()">فلتر</button>
+    <input id="pur_search" placeholder="بحث برقم الفاتورة أو المصدر" oninput="renderPurchases()" />
+  </div>
+  <div class="small">عدد الفواتير: <span id="pur_count">0</span> — المجموع: <span id="pur_sum">0.00</span></div>
+  <table id="purchases_table">
+    <thead><tr><th>رقم</th><th>تاريخ</th><th>المصدر</th><th>إجمالي</th><th>عرض</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- تقرير مشتريات حسب الأصناف -->
+<div class="card">
+  <h2>5- تقرير مشتريات (حسب الأصناف)</h2>
+  <div class="row">
+    من: <input id="rep_pur_from" type="date" /> إلى: <input id="rep_pur_to" type="date" />
+    <select id="rep_pur_sort">
+      <option value="name.asc">اسم ↑</option>
+      <option value="qty.desc">أعلى كمية</option>
+      <option value="qty.asc">أقل كمية</option>
+      <option value="cost.desc">أعلى تكلفة</option>
+      <option value="cost.asc">أقل تكلفة</option>
+      <option value="total.desc">أعلى إجمالي</option>
+      <option value="total.asc">أقل إجمالي</option>
+    </select>
+    <button onclick="renderPurchaseReport()">عرض التقرير</button>
+  </div>
+  <div class="small">عدد أصناف: <span id="rep_pur_count">0</span> — المجموع: <span id="rep_pur_sum">0.00</span></div>
+  <table id="rep_pur_table">
+    <thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- مبيعات -->
+<div class="card">
+  <h2>6- مبيعات</h2>
+  <div class="row">
+    <input id="sale_invoice_no" placeholder="رقم الفاتورة" />
+    <input id="sale_source" placeholder="المصدر / زبون" />
+    <input id="sale_date" type="date" />
+    <input id="sale_note" placeholder="ملاحظة" />
+  </div>
+  <h3>بنود الفاتورة</h3>
+  <div class="row">
+    <select id="sale_item_select"></select>
+    <input id="sale_item_unit" disabled placeholder="الوحدة" />
+    <input id="sale_item_price" placeholder="السعر" type="number" step="0.01" />
+    <input id="sale_item_qty" placeholder="الكمية" type="number" step="1" />
+    <button onclick="addSaleLine()">أضف للصنف</button>
+  </div>
+  <table id="sale_lines_table">
+    <thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th><th>الإجراء</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="row">
+    <div class="small">عدد الأصناف: <span id="sale_lines_count">0</span></div>
+    <div class="small">المجموع: <span id="sale_total">0.00</span></div>
+    <button onclick="saveSale()">حفظ فاتورة المبيعات</button>
+  </div>
+  <div class="small">ملاحظة: عند إدخال كمية يجب أن تكون ≤ المخزون المتاح. خلاف ذلك تظهر رسالة "الكمية غير متوفرة".</div>
+</div>
+
+<!-- قائمة فواتير المبيعات -->
+<div class="card">
+  <h2>7- قائمة فواتير المبيعات</h2>
+  <div class="row">
+    من: <input id="sale_filter_from" type="date" /> إلى: <input id="sale_filter_to" type="date" />
+    <button onclick="renderSales()">فلتر</button>
+    <input id="sale_search" placeholder="بحث برقم الفاتورة أو المصدر" oninput="renderSales()" />
+  </div>
+  <div class="small">عدد الفواتير: <span id="sale_count">0</span> — المجموع: <span id="sale_sum">0.00</span></div>
+  <table id="sales_table">
+    <thead><tr><th>رقم</th><th>تاريخ</th><th>المصدر</th><th>إجمالي</th><th>الربح</th><th>عرض</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- تقرير مبيعات حسب الأصناف -->
+<div class="card">
+  <h2>8- تقرير مبيعات (حسب الأصناف)</h2>
+  <div class="row">
+    من: <input id="rep_sale_from" type="date" /> إلى: <input id="rep_sale_to" type="date" />
+    <select id="rep_sale_sort">
+      <option value="name.asc">اسم ↑</option>
+      <option value="qty.desc">أعلى كمية</option>
+      <option value="qty.asc">أقل كمية</option>
+      <option value="price.desc">أعلى سعر</option>
+      <option value="price.asc">أقل سعر</option>
+      <option value="total.desc">أعلى إجمالي</option>
+      <option value="total.asc">أقل إجمالي</option>
+    </select>
+    <button onclick="renderSalesReport()">عرض التقرير</button>
+  </div>
+  <div class="small">عدد أصناف: <span id="rep_sale_count">0</span> — المجموع: <span id="rep_sale_sum">0.00</span> — تكلفة المبيعات: <span id="rep_sale_cost_sum">0.00</span> — أرباح المبيعات: <span id="rep_sale_profit">0.00</span></div>
+  <table id="rep_sale_table">
+    <thead><tr><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+/* نموذج بيانات مبسّط مخزن في localStorage:
+settings: {mode:'batch'|'average'}
+items: [{id,name,unit,manualCost,price,openingQty,openingValue,avgCost}]
+batches: [{id,itemId,qty,remainingQty,cost,type:'opening'|'purchase',date}]
+purchases: [{id,invoiceNo,source,date,note,lines:[{itemId,unit,cost,qty,total,batchId}],total}]
+sales: [{id,invoiceNo,source,date,note,lines:[{itemId,unit,price,qty,total,costForThisLine}],total,costTotal}]
+*/
+
+function uid(prefix='id'){return prefix + '_' + Math.random().toString(36).slice(2,9) }
+
+function load(key, def){ try{ let v=localStorage.getItem(key); return v?JSON.parse(v):def }catch(e){return def} }
+function save(key,val){ localStorage.setItem(key,JSON.stringify(val)) }
+
+let settings = load('settings',{mode:'batch'})
+let items = load('items',[])
+let batches = load('batches',[]) // inventory batches
+let purchases = load('purchases',[])
+let sales = load('sales',[])
+
+document.getElementById('mode').value = settings.mode
+document.getElementById('mode').addEventListener('change', e=>{
+  settings.mode = e.target.value; save('settings',settings); renderItems(); alert('تم تغيير وضع التكلفة إلى: '+settings.mode)
+})
+
+function persistAll(){ save('settings',settings); save('items',items); save('batches',batches); save('purchases',purchases); save('sales',sales) }
+
+/* --- Items --- */
+function addItem(){
+  const name = document.getElementById('item_name').value.trim()
+  const unit = document.getElementById('item_unit').value.trim() || 'pcs'
+  const cost = parseFloat(document.getElementById('item_cost').value) || 0
+  const price = parseFloat(document.getElementById('item_price').value) || 0
+  const openQty = parseInt(document.getElementById('item_open_qty').value) || 0
+  if(!name){ alert('ادخل اسم الصنف'); return }
+  const id = uid('item')
+  const item = {id,name,unit,manualCost:cost,price,openingQty:openQty,openingValue: openQty*cost,avgCost: cost}
+  items.push(item)
+  // create opening batch if qty>0
+  if(openQty>0){
+    const b = {id:uid('batch'),itemId:id,qty:openQty,remainingQty:openQty,cost:cost,type:'opening',date:new Date().toISOString(),note:'opening'}
+    batches.push(b)
+  }
+  persistAll()
+  clearItemForm()
+  renderItems()
+  fillItemSelects()
+}
+function clearItemForm(){
+  ['item_name','item_unit','item_cost','item_price','item_open_qty'].forEach(id=>document.getElementById(id).value='')
+}
+function fillItemSelects(){
+  const selIds = ['pur_item_select','sale_item_select']
+  selIds.forEach(selId=>{
+    const sel = document.getElementById(selId)
+    sel.innerHTML = ''
+    items.forEach(it=>{
+      const opt = document.createElement('option'); opt.value = it.id; opt.textContent = `${it.name} [${it.id}]`; sel.appendChild(opt)
+    })
+    sel.onchange = function(){
+      const id = sel.value; const it = items.find(x=>x.id===id)
+      if(selId==='pur_item_select'){
+        document.getElementById('pur_item_unit').value = it.unit
+        document.getElementById('pur_item_cost').value = it.manualCost || ''
+      }else{
+        document.getElementById('sale_item_unit').value = it.unit
+        document.getElementById('sale_item_price').value = it.price || ''
+      }
+    }
+  })
+}
+function itemStockQty(itemId){
+  return batches.filter(b=>b.itemId===itemId).reduce((s,b)=>s+(b.remainingQty||0),0)
+}
+function itemStockValue(itemId){
+  return batches.filter(b=>b.itemId===itemId).reduce((s,b)=>s + (b.remainingQty||0)*(b.cost||0),0)
+}
+function renderItems(){
+  const tbody = document.querySelector('#items_table tbody'); tbody.innerHTML=''
+  const q = document.getElementById('search_items').value.trim().toLowerCase()
+  let list = items.filter(it=>it.name.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
+  const sort = document.getElementById('sort_items').value
+  list.sort((a,b)=>{
+    const [k,dir] = sort.split('.')
+    let va, vb
+    if(k==='id'){ va=a.id; vb=b.id }
+    else if(k==='qty'){ va=itemStockQty(a.id); vb=itemStockQty(b.id) }
+    else if(k==='cost'){ va=(a.manualCost||0); vb=(b.manualCost||0) }
+    else if(k==='price'){ va=(a.price||0); vb=(b.price||0) }
+    if(typeof va === 'string') return dir==='asc'? va.localeCompare(vb): vb.localeCompare(va)
+    return dir==='asc'? (va-vb):(vb-va)
+  })
+  list.forEach(it=>{
+    const tr = document.createElement('tr')
+    const stockQty = itemStockQty(it.id)
+    const totalVal = itemStockValue(it.id)
+    const purchasesCount = purchases.reduce((s,p)=> s + p.lines.filter(l=>l.itemId===it.id).reduce((ss,l)=>ss+l.qty,0),0)
+    const salesCount = sales.reduce((s,p)=> s + p.lines.filter(l=>l.itemId===it.id).reduce((ss,l)=>ss+l.qty,0),0)
+    tr.innerHTML = `<td>${it.id}</td>
+      <td>${it.name}</td>
+      <td>${it.unit}</td>
+      <td>${formatNumber(it.manualCost)} ${settings.mode==='average'? '<br><span class="small">avg:'+formatNumber(it.avgCost||0)+'</span>':''}</td>
+      <td>${formatNumber(it.price)}</td>
+      <td>${it.openingQty||0}</td>
+      <td>${purchasesCount}</td>
+      <td>${salesCount}</td>
+      <td>${stockQty}</td>
+      <td>${formatNumber(totalVal)}</td>
+      <td class="actions">
+        <button onclick="editItem('${it.id}')">تعديل</button>
+        <button onclick="viewBatches('${it.id}')">دفعات</button>
+      </td>`
+    tbody.appendChild(tr)
+  })
+  document.getElementById('items_count').textContent = `عرض ${list.length} من ${items.length} أصناف`
+}
+
+function editItem(id){
+  const it = items.find(x=>x.id===id)
+  if(!it){ alert('الصنف غير موجود'); return }
+  const newName = prompt('اسم الصنف', it.name); if(newName===null) return
+  const newUnit = prompt('الوحدة', it.unit); if(newUnit===null) return
+  const newManual = parseFloat(prompt('التكلفة اليدوية الافتراضية (لن تغيّر دفعات سابقة)', it.manualCost || 0))
+  const newPrice = parseFloat(prompt('السعر', it.price || 0))
+  it.name = newName || it.name
+  it.unit = newUnit || it.unit
+  it.manualCost = isNaN(newManual)? it.manualCost: newManual
+  it.price = isNaN(newPrice)? it.price: newPrice
+  persistAll(); renderItems(); fillItemSelects()
+}
+
+function viewBatches(itemId){
+  const b = batches.filter(x=>x.itemId===itemId)
+  if(b.length===0){ alert('لا دفعات لهذا الصنف'); return }
+  let msg = 'دفعات الصنف:\n'
+  b.forEach(x=> msg += `${x.id} | نوع:${x.type} | تاريخ:${(new Date(x.date)).toLocaleDateString()} | كمية:${x.qty} | متبقي:${x.remainingQty} | تكلفة:${formatNumber(x.cost)}\n`)
+  alert(msg)
+}
+
+/* --- Purchases --- */
+let currentPurLines = []
+function addPurchaseLine(){
+  const sel = document.getElementById('pur_item_select'); const itemId = sel.value
+  const it = items.find(x=>x.id===itemId)
+  if(!it){ alert('اختر صنف'); return }
+  const unit = it.unit
+  const cost = parseFloat(document.getElementById('pur_item_cost').value) || it.manualCost || 0
+  const qty = parseInt(document.getElementById('pur_item_qty').value) || 0
+  if(qty<=0){ alert('ادخل كمية أكبر من صفر'); return }
+  const total = qty * cost
+  const line = {id:uid('pline'),itemId,unit,cost,qty,total}
+  currentPurLines.push(line)
+  renderPurLines()
+}
+function renderPurLines(){
+  const tbody = document.querySelector('#pur_lines_table tbody'); tbody.innerHTML=''
+  currentPurLines.forEach((l,i)=>{
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${i+1}</td><td>${items.find(it=>it.id===l.itemId).name}</td><td>${l.unit}</td><td>${formatNumber(l.cost)}</td><td>${l.qty}</td><td>${formatNumber(l.total)}</td><td><button onclick="removePurLine('${l.id}')">حذف</button></td>`
+    tbody.appendChild(tr)
+  })
+  const total = currentPurLines.reduce((s,l)=>s+l.total,0)
+  document.getElementById('pur_lines_count').textContent = currentPurLines.length
+  document.getElementById('pur_total').textContent = formatNumber(total)
+}
+function removePurLine(id){ currentPurLines = currentPurLines.filter(l=>l.id!==id); renderPurLines() }
+
+function savePurchase(){
+  if(currentPurLines.length===0){ alert('لا توجد بنود للحفظ'); return }
+  const invoiceNo = document.getElementById('pur_invoice_no').value.trim() || uid('inv')
+  const source = document.getElementById('pur_source').value.trim() || ''
+  const date = document.getElementById('pur_date').value || new Date().toISOString().slice(0,10)
+  const note = document.getElementById('pur_note').value || ''
+  const pur = {id:uid('purchase'),invoiceNo,source,date,note,lines: JSON.parse(JSON.stringify(currentPurLines)),total: currentPurLines.reduce((s,l)=>s+l.total,0)}
+  // Persist purchase and create batches OR update avg
+  pur.lines.forEach(l=>{
+    const item = items.find(it=>it.id===l.itemId)
+    if(settings.mode==='batch'){
+      const b = {id:uid('batch'),itemId:l.itemId,qty:l.qty,remainingQty:l.qty,cost:l.cost,type:'purchase',date:new Date().toISOString(),note:`pur:${invoiceNo}`}
+      batches.push(b)
+    }else{ // average
+      // update avgCost: (current_value + purchase_value) / (current_qty + purchase_qty)
+      const currentQty = itemStockQty(l.itemId)
+      const currentVal = itemStockValue(l.itemId)
+      const newQty = currentQty + l.qty
+      const newVal = currentVal + l.total
+      const newAvg = newQty>0? (newVal/newQty): l.cost
+      item.avgCost = newAvg
+      // For average mode we can still store batches as a single entry representing total stock at avg cost, OR keep existing batches untouched and rely on avg cost for cost of sale.
+      // Simpler: add a batch entry representing this purchase with its cost (so stockQty/stockValue sums match avg when used)
+      const b = {id:uid('batch'),itemId:l.itemId,qty:l.qty,remainingQty:l.qty,cost:newAvg,type:'purchase',date:new Date().toISOString(),note:`pur:${invoiceNo}`}
+      batches.push(b)
+    }
+  })
+  purchases.push(pur)
+  persistAll()
+  currentPurLines = []
+  renderPurLines()
+  renderPurchases()
+  renderItems()
+  fillItemSelects()
+  alert('حفظت فاتورة المشتريات: ' + invoiceNo)
+}
+
+/* Purchases list */
+function renderPurchases(){
+  const tbody = document.querySelector('#purchases_table tbody'); tbody.innerHTML=''
+  const from = document.getElementById('pur_filter_from').value
+  const to = document.getElementById('pur_filter_to').value
+  const q = document.getElementById('pur_search').value.trim().toLowerCase()
+  let list = purchases.filter(p=>{
+    if(q && !(p.invoiceNo.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q))) return false
+    if(from && p.date < from) return false
+    if(to && p.date > to) return false
+    return true
+  })
+  let sum=0
+  list.forEach(p=>{
+    sum += p.total
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${p.invoiceNo}</td><td>${p.date}</td><td>${p.source}</td><td>${formatNumber(p.total)}</td><td><button onclick="viewPurchase('${p.id}')">عرض</button></td>`
+    tbody.appendChild(tr)
+  })
+  document.getElementById('pur_count').textContent = list.length
+  document.getElementById('pur_sum').textContent = formatNumber(sum)
+}
+function viewPurchase(id){
+  const p = purchases.find(x=>x.id===id)
+  if(!p) return alert('غير موجود')
+  let txt = `فاتورة مشتريات #${p.invoiceNo}\nالتاريخ: ${p.date}\nالمصدر: ${p.source}\nالمجموع: ${formatNumber(p.total)}\nبنود:\n`
+  p.lines.forEach(l=> txt += `${items.find(it=>it.id===l.itemId).name} | تكلفة:${formatNumber(l.cost)} | كمية:${l.qty} | إجمالي:${formatNumber(l.total)}\n`)
+  alert(txt)
+}
+
+/* Purchase report by items */
+function renderPurchaseReport(){
+  const from = document.getElementById('rep_pur_from').value
+  const to = document.getElementById('rep_pur_to').value
+  const sort = document.getElementById('rep_pur_sort').value
+  let map = {}
+  purchases.forEach(p=>{
+    if(from && p.date < from) return
+    if(to && p.date > to) return
+    p.lines.forEach(l=>{
+      if(!map[l.itemId]) map[l.itemId] = {qty:0,total:0,cost: l.cost, item: items.find(it=>it.id===l.itemId)}
+      map[l.itemId].qty += l.qty
+      map[l.itemId].total += l.total
+    })
+  })
+  let arr = Object.values(map)
+  arr.sort((a,b)=>{
+    const [k,d] = sort.split('.')
+    if(k==='name') return a.item.name.localeCompare(b.item.name)
+    if(k==='qty') return d==='desc'? b.qty-a.qty: a.qty-b.qty
+    if(k==='cost') return d==='desc'? b.cost-a.cost: a.cost-b.cost
+    if(k==='total') return d==='desc'? b.total-a.total: a.total-b.total
+    return 0
+  })
+  const tbody = document.querySelector('#rep_pur_table tbody'); tbody.innerHTML=''
+  let sum=0
+  arr.forEach(r=>{
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${r.item.name}</td><td>${r.item.unit}</td><td>${formatNumber(r.cost)}</td><td>${r.qty}</td><td>${formatNumber(r.total)}</td>`
+    tbody.appendChild(tr)
+    sum += r.total
+  })
+  document.getElementById('rep_pur_count').textContent = arr.length
+  document.getElementById('rep_pur_sum').textContent = formatNumber(sum)
+}
+
+/* --- Sales --- */
+let currentSaleLines = []
+function addSaleLine(){
+  const sel = document.getElementById('sale_item_select'); const itemId = sel.value
+  const it = items.find(x=>x.id===itemId)
+  if(!it){ alert('اختر صنف'); return }
+  const unit = it.unit
+  const price = parseFloat(document.getElementById('sale_item_price').value) || it.price || 0
+  const qty = parseInt(document.getElementById('sale_item_qty').value) || 0
+  if(qty<=0){ alert('ادخل كمية أكبر من صفر'); return }
+  const available = itemStockQty(itemId)
+  if(qty > available){ alert('الكمية غير متوفرة'); return }
+  const total = qty * price
+  const line = {id:uid('sline'),itemId,unit,price,qty,total}
+  currentSaleLines.push(line)
+  renderSaleLines()
+}
+function renderSaleLines(){
+  const tbody = document.querySelector('#sale_lines_table tbody'); tbody.innerHTML=''
+  currentSaleLines.forEach((l,i)=>{
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${i+1}</td><td>${items.find(it=>it.id===l.itemId).name}</td><td>${l.unit}</td><td>${formatNumber(l.price)}</td><td>${l.qty}</td><td>${formatNumber(l.total)}</td><td><button onclick="removeSaleLine('${l.id}')">حذف</button></td>`
+    tbody.appendChild(tr)
+  })
+  const total = currentSaleLines.reduce((s,l)=>s+l.total,0)
+  document.getElementById('sale_lines_count').textContent = currentSaleLines.length
+  document.getElementById('sale_total').textContent = formatNumber(total)
+}
+function removeSaleLine(id){ currentSaleLines = currentSaleLines.filter(l=>l.id!==id); renderSaleLines() }
+
+function saveSale(){
+  if(currentSaleLines.length===0){ alert('لا توجد بنود للحفظ'); return }
+  // verify stock again
+  const grouped = {}
+  currentSaleLines.forEach(l=> grouped[l.itemId] = (grouped[l.itemId]||0) + l.qty)
+  for(const itemId in grouped){
+    if(grouped[itemId] > itemStockQty(itemId)){ alert('الكمية غير متوفرة لبعض الأصناف'); return }
+  }
+
+  const invoiceNo = document.getElementById('sale_invoice_no').value.trim() || uid('sinv')
+  const source = document.getElementById('sale_source').value.trim() || ''
+  const date = document.getElementById('sale_date').value || new Date().toISOString().slice(0,10)
+  const note = document.getElementById('sale_note').value || ''
+
+  // When selling, we must compute cost for each line depending on mode:
+  // - batch: consume from oldest batches (FIFO) and sum cost
+  // - average: use item's avgCost at this moment for cost
+  let sale = {id:uid('sale'),invoiceNo,source,date,note,lines:[],total:0,costTotal:0}
+  currentSaleLines.forEach(l=>{
+    let remaining = l.qty
+    let costForLine = 0
+    if(settings.mode==='batch'){
+      // consume oldest batches (FIFO)
+      const itemBatches = batches.filter(b=>b.itemId===l.itemId && b.remainingQty>0).sort((a,b)=> new Date(a.date) - new Date(b.date))
+      for(const b of itemBatches){
+        if(remaining<=0) break
+        const take = Math.min(b.remainingQty, remaining)
+        b.remainingQty -= take
+        remaining -= take
+        costForLine += take * b.cost
+      }
+      // record line with computed cost
+      sale.lines.push({...l, costForThisLine: costForLine})
+      sale.costTotal += costForLine
+    }else{
+      // average: use item.avgCost
+      const it = items.find(x=>x.id===l.itemId)
+      const avg = it.avgCost || it.manualCost || 0
+      costForLine = l.qty * avg
+      // reduce batches quantity: here for consistency reduce from oldest batches as well (we must decrement remainingQty)
+      let rem = l.qty
+      const itemBatches = batches.filter(b=>b.itemId===l.itemId && b.remainingQty>0).sort((a,b)=> new Date(a.date) - new Date(b.date))
+      for(const b of itemBatches){
+        if(rem<=0) break
+        const take = Math.min(b.remainingQty, rem)
+        b.remainingQty -= take
+        rem -= take
+      }
+      sale.lines.push({...l, costForThisLine: costForLine})
+      sale.costTotal += costForLine
+    }
+    sale.total += l.total
+  })
+
+  sales.push(sale)
+  persistAll()
+  currentSaleLines = []
+  renderSaleLines()
+  renderSales()
+  renderItems()
+  alert('حفظت فاتورة مبيعات: ' + invoiceNo)
+}
+
+/* Sales list */
+function renderSales(){
+  const tbody = document.querySelector('#sales_table tbody'); tbody.innerHTML=''
+  const from = document.getElementById('sale_filter_from').value
+  const to = document.getElementById('sale_filter_to').value
+  const q = document.getElementById('sale_search').value.trim().toLowerCase()
+  let list = sales.filter(p=>{
+    if(q && !(p.invoiceNo.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q))) return false
+    if(from && p.date < from) return false
+    if(to && p.date > to) return false
+    return true
+  })
+  let sum=0
+  list.forEach(p=>{
+    sum += p.total
+    const profit = p.total - p.costTotal
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${p.invoiceNo}</td><td>${p.date}</td><td>${p.source}</td><td>${formatNumber(p.total)}</td><td>${formatNumber(profit)}</td><td><button onclick="viewSale('${p.id}')">عرض</button></td>`
+    tbody.appendChild(tr)
+  })
+  document.getElementById('sale_count').textContent = list.length
+  document.getElementById('sale_sum').textContent = formatNumber(sum)
+}
+function viewSale(id){
+  const p = sales.find(x=>x.id===id)
+  if(!p) return alert('غير موجود')
+  let txt = `فاتورة مبيعات #${p.invoiceNo}\nالتاريخ: ${p.date}\nالمصدر: ${p.source}\nإجمالي: ${formatNumber(p.total)}\nتكلفة الفاتورة: ${formatNumber(p.costTotal)}\nالربح: ${formatNumber(p.total - p.costTotal)}\nبنود:\n`
+  p.lines.forEach(l=> txt += `${items.find(it=>it.id===l.itemId).name} | سعر:${formatNumber(l.price)} | كمية:${l.qty} | إجمالي:${formatNumber(l.total)} | تكلفة البند:${formatNumber(l.costForThisLine || l.costForLine || 0)}\n`)
+  alert(txt)
+}
+
+/* Sales report by items */
+function renderSalesReport(){
+  const from = document.getElementById('rep_sale_from').value
+  const to = document.getElementById('rep_sale_to').value
+  const sort = document.getElementById('rep_sale_sort').value
+  let map = {}
+  sales.forEach(s=>{
+    if(from && s.date < from) return
+    if(to && s.date > to) return
+    s.lines.forEach(l=>{
+      if(!map[l.itemId]) map[l.itemId] = {qty:0,total:0, price: l.price, item: items.find(it=>it.id===l.itemId)}
+      map[l.itemId].qty += l.qty
+      map[l.itemId].total += l.total
+    })
+  })
+  let arr = Object.values(map)
+  arr.sort((a,b)=>{
+    const [k,d] = sort.split('.')
+    if(k==='name') return a.item.name.localeCompare(b.item.name)
+    if(k==='qty') return d==='desc'? b.qty-a.qty: a.qty-b.qty
+    if(k==='price') return d==='desc'? b.price-a.price: a.price-b.price
+    if(k==='total') return d==='desc'? b.total-a.total: a.total-b.total
+    return 0
+  })
+  const tbody = document.querySelector('#rep_sale_table tbody'); tbody.innerHTML=''
+  let sum=0, costSum=0
+  arr.forEach(r=>{
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${r.item.name}</td><td>${r.item.unit}</td><td>${formatNumber(r.price)}</td><td>${r.qty}</td><td>${formatNumber(r.total)}</td>`
+    tbody.appendChild(tr)
+    sum += r.total
+    // compute cost of sold items for report: scan sales within range to get accurate cost
+  })
+  // compute costSum by scanning sales
+  sales.forEach(s=>{
+    if(from && s.date < from) return
+    if(to && s.date > to) return
+    costSum += s.costTotal
+  })
+  document.getElementById('rep_sale_count').textContent = arr.length
+  document.getElementById('rep_sale_sum').textContent = formatNumber(sum)
+  document.getElementById('rep_sale_cost_sum').textContent = formatNumber(costSum)
+  document.getElementById('rep_sale_profit').textContent = formatNumber(sum - costSum)
+}
+
+/* Utilities */
+function formatNumber(x){ return Number(x || 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) }
+
+function exportData(){
+  const data = {settings,items,batches,purchases,sales}
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href=url; a.download='sunmi_pos_export.json'; a.click(); URL.revokeObjectURL(url)
+}
+function importData(){
+  const txt = prompt('الصق JSON هنا لاستيراد (سيستبدل البيانات الحالية). اكتب "موافق" لمتابعة الاستبدال مع وضع JSON في الحقل التالي.')
+  if(!txt) return
+  try{
+    const obj = JSON.parse(txt)
+    if(confirm('هل أنت متأكد؟ سيتم استبدال البيانات الحالية.')) {
+      settings = obj.settings || settings
+      items = obj.items || []
+      batches = obj.batches || []
+      purchases = obj.purchases || []
+      sales = obj.sales || []
+      persistAll(); renderAll(); alert('تم الاستيراد')
+    }
+  }catch(e){
+    alert('JSON غير صحيح: ' + e.message)
+  }
+}
+function clearAll(){
+  if(confirm('سيتم مسح كل البيانات من localStorage. التأكيد؟')){
+    localStorage.clear()
+    settings = {mode:'batch'}
+    items = []; batches = []; purchases = []; sales = []
+    persistAll(); renderAll()
+  }
+}
+
+function renderAll(){
+  fillItemSelects(); renderItems(); renderPurLines(); renderPurchases(); renderPurchaseReport(); renderSaleLines(); renderSales(); renderSalesReport()
+}
+renderAll()
+
+</script>
+</body>
+</html><!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>نظام مطاعم - POS (Sunmi)</title>
+<style>
+  body{font-family: "Noto Naskh Arabic", Tahoma, Arial; direction: rtl; padding:10px; background:#f6f8fa}
+  h1,h2{margin:8px 0}
+  .row{display:flex;gap:8px;align-items:center}
+  .col{flex:1}
+  input,select,button,textarea{padding:6px;border:1px solid #ccc;border-radius:4px}
+  table{width:100%;border-collapse:collapse;margin-top:8px;background:#fff}
+  th,td{padding:6px;border:1px solid #ddd;text-align:center}
+  th{background:#f0f0f0}
+  .card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:12px}
+  .small{font-size:12px;color:#555}
+  .actions button{margin-left:4px}
+  .error{color:#b00020}
+  .success{color:#006400}
+  .topbar{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+  .badge{background:#007bff;color:#fff;padding:4px 8px;border-radius:999px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  .hidden{display:none}
+  @media (max-width:800px){ .row{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<h1>نظام مطاعم - POS (Sunmi) — تطبيق ويب بسيط</h1>
+
+<div class="card topbar">
+  <div class="row col">
+    <label>وضع التكلفة: </label>
+    <select id="mode">
+      <option value="batch">دفعات (Batch / Each purchase keeps its cost)</option>
+      <option value="average">المتوسط المرجّح (Weighted Average)</option>
+    </select>
+    <span class="small">اختَر كيفية حساب تكلفة المخزون</span>
+  </div>
+  <div class="controls">
+    <button onclick="exportData()" title="تصدير البيانات">تصدير بيانات</button>
+    <button onclick="importData()" title="استيراد بيانات (يلصق JSON)">استيراد بيانات</button>
+    <button onclick="clearAll()" title="مسح بيانات التخزين المحلي">مسح كل البيانات</button>
+  </div>
+</div>
+
+<!-- إضافة صنف -->
+<div class="card">
+  <h2>1- إضافة صنف جديد</h2>
+  <div class="row">
+    <input id="item_name" placeholder="اسم الصنف" />
+    <input id="item_unit" placeholder="الوحدة (مثال: حبة، صحن)" />
+    <input id="item_cost" placeholder="التكلفة الافتراضية" type="number" step="0.01" />
+    <input id="item_price" placeholder="السعر" type="number" step="0.01" />
+    <input id="item_open_qty" placeholder="كمية أول المدة" type="number" step="1" />
+    <button onclick="addItem()">إضافة صنف</button>
+  </div>
+  <div class="small">ملاحظة: معرّف الصنف يُنشأ تلقائياً. تكلفة يدوية هنا تُستخدم كتكلفة افتراضية للشراء القادم (لا تغيّر دفعات سابقة).</div>
+</div>
+
+<!-- قائمة الأصناف -->
+<div class="card">
+  <h2>2- قائمة الأصناف</h2>
+  <div class="row">
+    <input id="search_items" placeholder="بحث باسم الصنف أو رقم التعريف" oninput="renderItems()" />
+    <select id="sort_items" onchange="renderItems()">
+      <option value="id.asc">رقم ↑</option>
+      <option value="id.desc">رقم ↓</option>
+      <option value="qty.desc">أعلى مخزون</option>
+      <option value="qty.asc">أقل مخزون</option>
+      <option value="cost.desc">أعلى تكلفة</option>
+      <option value="cost.asc">أقل تكلفة</option>
+      <option value="price.desc">أعلى سعر</option>
+      <option value="price.asc">أقل سعر</option>
+    </select>
+    <div class="small" id="items_count"></div>
+  </div>
+  <table id="items_table">
+    <thead>
+      <tr>
+        <th>ID</th><th>الاسم</th><th>الوحدة</th><th>التكلفة الحالية</th><th>السعر</th><th>فتح</th><th>مشتريات</th><th>مبيعات</th><th>المخزون(كمية)</th><th>إجمالي القيمة</th><th>إجراءات</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div class="small">ملاحظة: عند تعديل التكلفة اليدوية لا تُضرب فتح×التكلفة الجديدة — فتح يبقى بقيمته الأصلية من أجل حساب الأرباح بشكل صحيح.</div>
+</div>
+
+<!-- فاتورة مشتريات -->
+<div class="card">
+  <h2>3- إضافة فاتورة مشتريات</h2>
+  <div class="row">
+    <input id="pur_invoice_no" placeholder="رقم الفاتورة" />
+    <input id="pur_source" placeholder="المصدر / مورد" />
+    <input id="pur_date" type="date" />
+    <input id="pur_note" placeholder="ملاحظة" />
+  </div>
+  <h3>بنود الفاتورة</h3>
+  <div class="row">
+    <select id="pur_item_select"></select>
+    <input id="pur_item_unit" disabled placeholder="الوحدة" />
+    <input id="pur_item_cost" placeholder="التكلفة" type="number" step="0.01" />
+    <input id="pur_item_qty" placeholder="الكمية" type="number" step="1" />
+    <button onclick="addPurchaseLine()">أضف للصنف</button>
+  </div>
+  <table id="pur_lines_table">
+    <thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="row">
+    <div class="small">عدد الأصناف: <span id="pur_lines_count">0</span></div>
+    <div class="small">المجموع: <span id="pur_total">0.00</span></div>
+    <button onclick="savePurchase()">حفظ الفاتورة</button>
+  </div>
+</div>
+
+<!-- قائمة فواتير المشتريات -->
+<div class="card">
+  <h2>4- قائمة فواتير المشتريات</h2>
+  <div class="row">
+    من: <input id="pur_filter_from" type="date" /> إلى: <input id="pur_filter_to" type="date" />
+    <button onclick="renderPurchases()">فلتر</button>
+    <input id="pur_search" placeholder="بحث برقم الفاتورة أو المصدر" oninput="renderPurchases()" />
+  </div>
+  <div class="small">عدد الفواتير: <span id="pur_count">0</span> — المجموع: <span id="pur_sum">0.00</span></div>
+  <table id="purchases_table">
+    <thead><tr><th>رقم</th><th>تاريخ</th><th>المصدر</th><th>إجمالي</th><th>عرض</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- تقرير مشتريات حسب الأصناف -->
+<div class="card">
+  <h2>5- تقرير مشتريات (حسب الأصناف)</h2>
+  <div class="row">
+    من: <input id="rep_pur_from" type="date" /> إلى: <input id="rep_pur_to" type="date" />
+    <select id="rep_pur_sort">
+      <option value="name.asc">اسم ↑</option>
+      <option value="qty.desc">أعلى كمية</option>
+      <option value="qty.asc">أقل كمية</option>
+      <option value="cost.desc">أعلى تكلفة</option>
+      <option value="cost.asc">أقل تكلفة</option>
+      <option value="total.desc">أعلى إجمالي</option>
+      <option value="total.asc">أقل إجمالي</option>
+    </select>
+    <button onclick="renderPurchaseReport()">عرض التقرير</button>
+  </div>
+  <div class="small">عدد أصناف: <span id="rep_pur_count">0</span> — المجموع: <span id="rep_pur_sum">0.00</span></div>
+  <table id="rep_pur_table">
+    <thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- مبيعات -->
+<div class="card">
+  <h2>6- مبيعات</h2>
+  <div class="row">
+    <input id="sale_invoice_no" placeholder="رقم الفاتورة" />
+    <input id="sale_source" placeholder="المصدر / زبون" />
+    <input id="sale_date" type="date" />
+    <input id="sale_note" placeholder="ملاحظة" />
+  </div>
+  <h3>بنود الفاتورة</h3>
+  <div class="row">
+    <select id="sale_item_select"></select>
+    <input id="sale_item_unit" disabled placeholder="الوحدة" />
+    <input id="sale_item_price" placeholder="السعر" type="number" step="0.01" />
+    <input id="sale_item_qty" placeholder="الكمية" type="number" step="1" />
+    <button onclick="addSaleLine()">أضف للصنف</button>
+  </div>
+  <table id="sale_lines_table">
+    <thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th><th>الإجراء</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="row">
+    <div class="small">عدد الأصناف: <span id="sale_lines_count">0</span></div>
+    <div class="small">المجموع: <span id="sale_total">0.00</span></div>
+    <button onclick="saveSale()">حفظ فاتورة المبيعات</button>
+  </div>
+  <div class="small">ملاحظة: عند إدخال كمية يجب أن تكون ≤ المخزون المتاح. خلاف ذلك تظهر رسالة "الكمية غير متوفرة".</div>
+</div>
+
+<!-- قائمة فواتير المبيعات -->
+<div class="card">
+  <h2>7- قائمة فواتير المبيعات</h2>
+  <div class="row">
+    من: <input id="sale_filter_from" type="date" /> إلى: <input id="sale_filter_to" type="date" />
+    <button onclick="renderSales()">فلتر</button>
+    <input id="sale_search" placeholder="بحث برقم الفاتورة أو المصدر" oninput="renderSales()" />
+  </div>
+  <div class="small">عدد الفواتير: <span id="sale_count">0</span> — المجموع: <span id="sale_sum">0.00</span></div>
+  <table id="sales_table">
+    <thead><tr><th>رقم</th><th>تاريخ</th><th>المصدر</th><th>إجمالي</th><th>الربح</th><th>عرض</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- تقرير مبيعات حسب الأصناف -->
+<div class="card">
+  <h2>8- تقرير مبيعات (حسب الأصناف)</h2>
+  <div class="row">
+    من: <input id="rep_sale_from" type="date" /> إلى: <input id="rep_sale_to" type="date" />
+    <select id="rep_sale_sort">
+      <option value="name.asc">اسم ↑</option>
+      <option value="qty.desc">أعلى كمية</option>
+      <option value="qty.asc">أقل كمية</option>
+      <option value="price.desc">أعلى سعر</option>
+      <option value="price.asc">أقل سعر</option>
+      <option value="total.desc">أعلى إجمالي</option>
+      <option value="total.asc">أقل إجمالي</option>
+    </select>
+    <button onclick="renderSalesReport()">عرض التقرير</button>
+  </div>
+  <div class="small">عدد أصناف: <span id="rep_sale_count">0</span> — المجموع: <span id="rep_sale_sum">0.00</span> — تكلفة المبيعات: <span id="rep_sale_cost_sum">0.00</span> — أرباح المبيعات: <span id="rep_sale_profit">0.00</span></div>
+  <table id="rep_sale_table">
+    <thead><tr><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+/* نموذج بيانات مبسّط مخزن في localStorage:
+settings: {mode:'batch'|'average'}
+items: [{id,name,unit,manualCost,price,openingQty,openingValue,avgCost}]
+batches: [{id,itemId,qty,remainingQty,cost,type:'opening'|'purchase',date}]
+purchases: [{id,invoiceNo,source,date,note,lines:[{itemId,unit,cost,qty,total,batchId}],total}]
+sales: [{id,invoiceNo,source,date,note,lines:[{itemId,unit,price,qty,total,costForThisLine}],total,costTotal}]
+*/
+
+function uid(prefix='id'){return prefix + '_' + Math.random().toString(36).slice(2,9) }
+
+function load(key, def){ try{ let v=localStorage.getItem(key); return v?JSON.parse(v):def }catch(e){return def} }
+function save(key,val){ localStorage.setItem(key,JSON.stringify(val)) }
+
+let settings = load('settings',{mode:'batch'})
+let items = load('items',[])
+let batches = load('batches',[]) // inventory batches
+let purchases = load('purchases',[])
+let sales = load('sales',[])
+
+document.getElementById('mode').value = settings.mode
+document.getElementById('mode').addEventListener('change', e=>{
+  settings.mode = e.target.value; save('settings',settings); renderItems(); alert('تم تغيير وضع التكلفة إلى: '+settings.mode)
+})
+
+function persistAll(){ save('settings',settings); save('items',items); save('batches',batches); save('purchases',purchases); save('sales',sales) }
+
+/* --- Items --- */
+function addItem(){
+  const name = document.getElementById('item_name').value.trim()
+  const unit = document.getElementById('item_unit').value.trim() || 'pcs'
+  const cost = parseFloat(document.getElementById('item_cost').value) || 0
+  const price = parseFloat(document.getElementById('item_price').value) || 0
+  const openQty = parseInt(document.getElementById('item_open_qty').value) || 0
+  if(!name){ alert('ادخل اسم الصنف'); return }
+  const id = uid('item')
+  const item = {id,name,unit,manualCost:cost,price,openingQty:openQty,openingValue: openQty*cost,avgCost: cost}
+  items.push(item)
+  // create opening batch if qty>0
+  if(openQty>0){
+    const b = {id:uid('batch'),itemId:id,qty:openQty,remainingQty:openQty,cost:cost,type:'opening',date:new Date().toISOString(),note:'opening'}
+    batches.push(b)
+  }
+  persistAll()
+  clearItemForm()
+  renderItems()
+  fillItemSelects()
+}
+function clearItemForm(){
+  ['item_name','item_unit','item_cost','item_price','item_open_qty'].forEach(id=>document.getElementById(id).value='')
+}
+function fillItemSelects(){
+  const selIds = ['pur_item_select','sale_item_select']
+  selIds.forEach(selId=>{
+    const sel = document.getElementById(selId)
+    sel.innerHTML = ''
+    items.forEach(it=>{
+      const opt = document.createElement('option'); opt.value = it.id; opt.textContent = `${it.name} [${it.id}]`; sel.appendChild(opt)
+    })
+    sel.onchange = function(){
+      const id = sel.value; const it = items.find(x=>x.id===id)
+      if(selId==='pur_item_select'){
+        document.getElementById('pur_item_unit').value = it.unit
+        document.getElementById('pur_item_cost').value = it.manualCost || ''
+      }else{
+        document.getElementById('sale_item_unit').value = it.unit
+        document.getElementById('sale_item_price').value = it.price || ''
+      }
+    }
+  })
+}
+function itemStockQty(itemId){
+  return batches.filter(b=>b.itemId===itemId).reduce((s,b)=>s+(b.remainingQty||0),0)
+}
+function itemStockValue(itemId){
+  return batches.filter(b=>b.itemId===itemId).reduce((s,b)=>s + (b.remainingQty||0)*(b.cost||0),0)
+}
+function renderItems(){
+  const tbody = document.querySelector('#items_table tbody'); tbody.innerHTML=''
+  const q = document.getElementById('search_items').value.trim().toLowerCase()
+  let list = items.filter(it=>it.name.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
+  const sort = document.getElementById('sort_items').value
+  list.sort((a,b)=>{
+    const [k,dir] = sort.split('.')
+    let va, vb
+    if(k==='id'){ va=a.id; vb=b.id }
+    else if(k==='qty'){ va=itemStockQty(a.id); vb=itemStockQty(b.id) }
+    else if(k==='cost'){ va=(a.manualCost||0); vb=(b.manualCost||0) }
+    else if(k==='price'){ va=(a.price||0); vb=(b.price||0) }
+    if(typeof va === 'string') return dir==='asc'? va.localeCompare(vb): vb.localeCompare(va)
+    return dir==='asc'? (va-vb):(vb-va)
+  })
+  list.forEach(it=>{
+    const tr = document.createElement('tr')
+    const stockQty = itemStockQty(it.id)
+    const totalVal = itemStockValue(it.id)
+    const purchasesCount = purchases.reduce((s,p)=> s + p.lines.filter(l=>l.itemId===it.id).reduce((ss,l)=>ss+l.qty,0),0)
+    const salesCount = sales.reduce((s,p)=> s + p.lines.filter(l=>l.itemId===it.id).reduce((ss,l)=>ss+l.qty,0),0)
+    tr.innerHTML = `<td>${it.id}</td>
+      <td>${it.name}</td>
+      <td>${it.unit}</td>
+      <td>${formatNumber(it.manualCost)} ${settings.mode==='average'? '<br><span class="small">avg:'+formatNumber(it.avgCost||0)+'</span>':''}</td>
+      <td>${formatNumber(it.price)}</td>
+      <td>${it.openingQty||0}</td>
+      <td>${purchasesCount}</td>
+      <td>${salesCount}</td>
+      <td>${stockQty}</td>
+      <td>${formatNumber(totalVal)}</td>
+      <td class="actions">
+        <button onclick="editItem('${it.id}')">تعديل</button>
+        <button onclick="viewBatches('${it.id}')">دفعات</button>
+      </td>`
+    tbody.appendChild(tr)
+  })
+  document.getElementById('items_count').textContent = `عرض ${list.length} من ${items.length} أصناف`
+}
+
+function editItem(id){
+  const it = items.find(x=>x.id===id)
+  if(!it){ alert('الصنف غير موجود'); return }
+  const newName = prompt('اسم الصنف', it.name); if(newName===null) return
+  const newUnit = prompt('الوحدة', it.unit); if(newUnit===null) return
+  const newManual = parseFloat(prompt('التكلفة اليدوية الافتراضية (لن تغيّر دفعات سابقة)', it.manualCost || 0))
+  const newPrice = parseFloat(prompt('السعر', it.price || 0))
+  it.name = newName || it.name
+  it.unit = newUnit || it.unit
+  it.manualCost = isNaN(newManual)? it.manualCost: newManual
+  it.price = isNaN(newPrice)? it.price: newPrice
+  persistAll(); renderItems(); fillItemSelects()
+}
+
+function viewBatches(itemId){
+  const b = batches.filter(x=>x.itemId===itemId)
+  if(b.length===0){ alert('لا دفعات لهذا الصنف'); return }
+  let msg = 'دفعات الصنف:\n'
+  b.forEach(x=> msg += `${x.id} | نوع:${x.type} | تاريخ:${(new Date(x.date)).toLocaleDateString()} | كمية:${x.qty} | متبقي:${x.remainingQty} | تكلفة:${formatNumber(x.cost)}\n`)
+  alert(msg)
+}
+
+/* --- Purchases --- */
+let currentPurLines = []
+function addPurchaseLine(){
+  const sel = document.getElementById('pur_item_select'); const itemId = sel.value
+  const it = items.find(x=>x.id===itemId)
+  if(!it){ alert('اختر صنف'); return }
+  const unit = it.unit
+  const cost = parseFloat(document.getElementById('pur_item_cost').value) || it.manualCost || 0
+  const qty = parseInt(document.getElementById('pur_item_qty').value) || 0
+  if(qty<=0){ alert('ادخل كمية أكبر من صفر'); return }
+  const total = qty * cost
+  const line = {id:uid('pline'),itemId,unit,cost,qty,total}
+  currentPurLines.push(line)
+  renderPurLines()
+}
+function renderPurLines(){
+  const tbody = document.querySelector('#pur_lines_table tbody'); tbody.innerHTML=''
+  currentPurLines.forEach((l,i)=>{
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${i+1}</td><td>${items.find(it=>it.id===l.itemId).name}</td><td>${l.unit}</td><td>${formatNumber(l.cost)}</td><td>${l.qty}</td><td>${formatNumber(l.total)}</td><td><button onclick="removePurLine('${l.id}')">حذف</button></td>`
+    tbody.appendChild(tr)
+  })
+  const total = currentPurLines.reduce((s,l)=>s+l.total,0)
+  document.getElementById('pur_lines_count').textContent = currentPurLines.length
+  document.getElementById('pur_total').textContent = formatNumber(total)
+}
+function removePurLine(id){ currentPurLines = currentPurLines.filter(l=>l.id!==id); renderPurLines() }
+
+function savePurchase(){
+  if(currentPurLines.length===0){ alert('لا توجد بنود للحفظ'); return }
+  const invoiceNo = document.getElementById('pur_invoice_no').value.trim() || uid('inv')
+  const source = document.getElementById('pur_source').value.trim() || ''
+  const date = document.getElementById('pur_date').value || new Date().toISOString().slice(0,10)
+  const note = document.getElementById('pur_note').value || ''
+  const pur = {id:uid('purchase'),invoiceNo,source,date,note,lines: JSON.parse(JSON.stringify(currentPurLines)),total: currentPurLines.reduce((s,l)=>s+l.total,0)}
+  // Persist purchase and create batches OR update avg
+  pur.lines.forEach(l=>{
+    const item = items.find(it=>it.id===l.itemId)
+    if(settings.mode==='batch'){
+      const b = {id:uid('batch'),itemId:l.itemId,qty:l.qty,remainingQty:l.qty,cost:l.cost,type:'purchase',date:new Date().toISOString(),note:`pur:${invoiceNo}`}
+      batches.push(b)
+    }else{ // average
+      // update avgCost: (current_value + purchase_value) / (current_qty + purchase_qty)
+      const currentQty = itemStockQty(l.itemId)
+      const currentVal = itemStockValue(l.itemId)
+      const newQty = currentQty + l.qty
+      const newVal = currentVal + l.total
+      const newAvg = newQty>0? (newVal/newQty): l.cost
+      item.avgCost = newAvg
+      // For average mode we can still store batches as a single entry representing total stock at avg cost, OR keep existing batches untouched and rely on avg cost for cost of sale.
+      // Simpler: add a batch entry representing this purchase with its cost (so stockQty/stockValue sums match avg when used)
+      const b = {id:uid('batch'),itemId:l.itemId,qty:l.qty,remainingQty:l.qty,cost:newAvg,type:'purchase',date:new Date().toISOString(),note:`pur:${invoiceNo}`}
+      batches.push(b)
+    }
+  })
+  purchases.push(pur)
+  persistAll()
+  currentPurLines = []
+  renderPurLines()
+  renderPurchases()
+  renderItems()
+  fillItemSelects()
+  alert('حفظت فاتورة المشتريات: ' + invoiceNo)
+}
+
+/* Purchases list */
+function renderPurchases(){
+  const tbody = document.querySelector('#purchases_table tbody'); tbody.innerHTML=''
+  const from = document.getElementById('pur_filter_from').value
+  const to = document.getElementById('pur_filter_to').value
+  const q = document.getElementById('pur_search').value.trim().toLowerCase()
+  let list = purchases.filter(p=>{
+    if(q && !(p.invoiceNo.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q))) return false
+    if(from && p.date < from) return false
+    if(to && p.date > to) return false
+    return true
+  })
+  let sum=0
+  list.forEach(p=>{
+    sum += p.total
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${p.invoiceNo}</td><td>${p.date}</td><td>${p.source}</td><td>${formatNumber(p.total)}</td><td><button onclick="viewPurchase('${p.id}')">عرض</button></td>`
+    tbody.appendChild(tr)
+  })
+  document.getElementById('pur_count').textContent = list.length
+  document.getElementById('pur_sum').textContent = formatNumber(sum)
+}
+function viewPurchase(id){
+  const p = purchases.find(x=>x.id===id)
+  if(!p) return alert('غير موجود')
+  let txt = `فاتورة مشتريات #${p.invoiceNo}\nالتاريخ: ${p.date}\nالمصدر: ${p.source}\nالمجموع: ${formatNumber(p.total)}\nبنود:\n`
+  p.lines.forEach(l=> txt += `${items.find(it=>it.id===l.itemId).name} | تكلفة:${formatNumber(l.cost)} | كمية:${l.qty} | إجمالي:${formatNumber(l.total)}\n`)
+  alert(txt)
+}
+
+/* Purchase report by items */
+function renderPurchaseReport(){
+  const from = document.getElementById('rep_pur_from').value
+  const to = document.getElementById('rep_pur_to').value
+  const sort = document.getElementById('rep_pur_sort').value
+  let map = {}
+  purchases.forEach(p=>{
+    if(from && p.date < from) return
+    if(to && p.date > to) return
+    p.lines.forEach(l=>{
+      if(!map[l.itemId]) map[l.itemId] = {qty:0,total:0,cost: l.cost, item: items.find(it=>it.id===l.itemId)}
+      map[l.itemId].qty += l.qty
+      map[l.itemId].total += l.total
+    })
+  })
+  let arr = Object.values(map)
+  arr.sort((a,b)=>{
+    const [k,d] = sort.split('.')
+    if(k==='name') return a.item.name.localeCompare(b.item.name)
+    if(k==='qty') return d==='desc'? b.qty-a.qty: a.qty-b.qty
+    if(k==='cost') return d==='desc'? b.cost-a.cost: a.cost-b.cost
+    if(k==='total') return d==='desc'? b.total-a.total: a.total-b.total
+    return 0
+  })
+  const tbody = document.querySelector('#rep_pur_table tbody'); tbody.innerHTML=''
+  let sum=0
+  arr.forEach(r=>{
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${r.item.name}</td><td>${r.item.unit}</td><td>${formatNumber(r.cost)}</td><td>${r.qty}</td><td>${formatNumber(r.total)}</td>`
+    tbody.appendChild(tr)
+    sum += r.total
+  })
+  document.getElementById('rep_pur_count').textContent = arr.length
+  document.getElementById('rep_pur_sum').textContent = formatNumber(sum)
+}
+
+/* --- Sales --- */
+let currentSaleLines = []
+function addSaleLine(){
+  const sel = document.getElementById('sale_item_select'); const itemId = sel.value
+  const it = items.find(x=>x.id===itemId)
+  if(!it){ alert('اختر صنف'); return }
+  const unit = it.unit
+  const price = parseFloat(document.getElementById('sale_item_price').value) || it.price || 0
+  const qty = parseInt(document.getElementById('sale_item_qty').value) || 0
+  if(qty<=0){ alert('ادخل كمية أكبر من صفر'); return }
+  const available = itemStockQty(itemId)
+  if(qty > available){ alert('الكمية غير متوفرة'); return }
+  const total = qty * price
+  const line = {id:uid('sline'),itemId,unit,price,qty,total}
+  currentSaleLines.push(line)
+  renderSaleLines()
+}
+function renderSaleLines(){
+  const tbody = document.querySelector('#sale_lines_table tbody'); tbody.innerHTML=''
+  currentSaleLines.forEach((l,i)=>{
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${i+1}</td><td>${items.find(it=>it.id===l.itemId).name}</td><td>${l.unit}</td><td>${formatNumber(l.price)}</td><td>${l.qty}</td><td>${formatNumber(l.total)}</td><td><button onclick="removeSaleLine('${l.id}')">حذف</button></td>`
+    tbody.appendChild(tr)
+  })
+  const total = currentSaleLines.reduce((s,l)=>s+l.total,0)
+  document.getElementById('sale_lines_count').textContent = currentSaleLines.length
+  document.getElementById('sale_total').textContent = formatNumber(total)
+}
+function removeSaleLine(id){ currentSaleLines = currentSaleLines.filter(l=>l.id!==id); renderSaleLines() }
+
+function saveSale(){
+  if(currentSaleLines.length===0){ alert('لا توجد بنود للحفظ'); return }
+  // verify stock again
+  const grouped = {}
+  currentSaleLines.forEach(l=> grouped[l.itemId] = (grouped[l.itemId]||0) + l.qty)
+  for(const itemId in grouped){
+    if(grouped[itemId] > itemStockQty(itemId)){ alert('الكمية غير متوفرة لبعض الأصناف'); return }
+  }
+
+  const invoiceNo = document.getElementById('sale_invoice_no').value.trim() || uid('sinv')
+  const source = document.getElementById('sale_source').value.trim() || ''
+  const date = document.getElementById('sale_date').value || new Date().toISOString().slice(0,10)
+  const note = document.getElementById('sale_note').value || ''
+
+  // When selling, we must compute cost for each line depending on mode:
+  // - batch: consume from oldest batches (FIFO) and sum cost
+  // - average: use item's avgCost at this moment for cost
+  let sale = {id:uid('sale'),invoiceNo,source,date,note,lines:[],total:0,costTotal:0}
+  currentSaleLines.forEach(l=>{
+    let remaining = l.qty
+    let costForLine = 0
+    if(settings.mode==='batch'){
+      // consume oldest batches (FIFO)
+      const itemBatches = batches.filter(b=>b.itemId===l.itemId && b.remainingQty>0).sort((a,b)=> new Date(a.date) - new Date(b.date))
+      for(const b of itemBatches){
+        if(remaining<=0) break
+        const take = Math.min(b.remainingQty, remaining)
+        b.remainingQty -= take
+        remaining -= take
+        costForLine += take * b.cost
+      }
+      // record line with computed cost
+      sale.lines.push({...l, costForThisLine: costForLine})
+      sale.costTotal += costForLine
+    }else{
+      // average: use item.avgCost
+      const it = items.find(x=>x.id===l.itemId)
+      const avg = it.avgCost || it.manualCost || 0
+      costForLine = l.qty * avg
+      // reduce batches quantity: here for consistency reduce from oldest batches as well (we must decrement remainingQty)
+      let rem = l.qty
+      const itemBatches = batches.filter(b=>b.itemId===l.itemId && b.remainingQty>0).sort((a,b)=> new Date(a.date) - new Date(b.date))
+      for(const b of itemBatches){
+        if(rem<=0) break
+        const take = Math.min(b.remainingQty, rem)
+        b.remainingQty -= take
+        rem -= take
+      }
+      sale.lines.push({...l, costForThisLine: costForLine})
+      sale.costTotal += costForLine
+    }
+    sale.total += l.total
+  })
+
+  sales.push(sale)
+  persistAll()
+  currentSaleLines = []
+  renderSaleLines()
+  renderSales()
+  renderItems()
+  alert('حفظت فاتورة مبيعات: ' + invoiceNo)
+}
+
+/* Sales list */
+function renderSales(){
+  const tbody = document.querySelector('#sales_table tbody'); tbody.innerHTML=''
+  const from = document.getElementById('sale_filter_from').value
+  const to = document.getElementById('sale_filter_to').value
+  const q = document.getElementById('sale_search').value.trim().toLowerCase()
+  let list = sales.filter(p=>{
+    if(q && !(p.invoiceNo.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q))) return false
+    if(from && p.date < from) return false
+    if(to && p.date > to) return false
+    return true
+  })
+  let sum=0
+  list.forEach(p=>{
+    sum += p.total
+    const profit = p.total - p.costTotal
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${p.invoiceNo}</td><td>${p.date}</td><td>${p.source}</td><td>${formatNumber(p.total)}</td><td>${formatNumber(profit)}</td><td><button onclick="viewSale('${p.id}')">عرض</button></td>`
+    tbody.appendChild(tr)
+  })
+  document.getElementById('sale_count').textContent = list.length
+  document.getElementById('sale_sum').textContent = formatNumber(sum)
+}
+function viewSale(id){
+  const p = sales.find(x=>x.id===id)
+  if(!p) return alert('غير موجود')
+  let txt = `فاتورة مبيعات #${p.invoiceNo}\nالتاريخ: ${p.date}\nالمصدر: ${p.source}\nإجمالي: ${formatNumber(p.total)}\nتكلفة الفاتورة: ${formatNumber(p.costTotal)}\nالربح: ${formatNumber(p.total - p.costTotal)}\nبنود:\n`
+  p.lines.forEach(l=> txt += `${items.find(it=>it.id===l.itemId).name} | سعر:${formatNumber(l.price)} | كمية:${l.qty} | إجمالي:${formatNumber(l.total)} | تكلفة البند:${formatNumber(l.costForThisLine || l.costForLine || 0)}\n`)
+  alert(txt)
+}
+
+/* Sales report by items */
+function renderSalesReport(){
+  const from = document.getElementById('rep_sale_from').value
+  const to = document.getElementById('rep_sale_to').value
+  const sort = document.getElementById('rep_sale_sort').value
+  let map = {}
+  sales.forEach(s=>{
+    if(from && s.date < from) return
+    if(to && s.date > to) return
+    s.lines.forEach(l=>{
+      if(!map[l.itemId]) map[l.itemId] = {qty:0,total:0, price: l.price, item: items.find(it=>it.id===l.itemId)}
+      map[l.itemId].qty += l.qty
+      map[l.itemId].total += l.total
+    })
+  })
+  let arr = Object.values(map)
+  arr.sort((a,b)=>{
+    const [k,d] = sort.split('.')
+    if(k==='name') return a.item.name.localeCompare(b.item.name)
+    if(k==='qty') return d==='desc'? b.qty-a.qty: a.qty-b.qty
+    if(k==='price') return d==='desc'? b.price-a.price: a.price-b.price
+    if(k==='total') return d==='desc'? b.total-a.total: a.total-b.total
+    return 0
+  })
+  const tbody = document.querySelector('#rep_sale_table tbody'); tbody.innerHTML=''
+  let sum=0, costSum=0
+  arr.forEach(r=>{
+    const tr = document.createElement('tr')
+    tr.innerHTML = `<td>${r.item.name}</td><td>${r.item.unit}</td><td>${formatNumber(r.price)}</td><td>${r.qty}</td><td>${formatNumber(r.total)}</td>`
+    tbody.appendChild(tr)
+    sum += r.total
+    // compute cost of sold items for report: scan sales within range to get accurate cost
+  })
+  // compute costSum by scanning sales
+  sales.forEach(s=>{
+    if(from && s.date < from) return
+    if(to && s.date > to) return
+    costSum += s.costTotal
+  })
+  document.getElementById('rep_sale_count').textContent = arr.length
+  document.getElementById('rep_sale_sum').textContent = formatNumber(sum)
+  document.getElementById('rep_sale_cost_sum').textContent = formatNumber(costSum)
+  document.getElementById('rep_sale_profit').textContent = formatNumber(sum - costSum)
+}
+
+/* Utilities */
+function formatNumber(x){ return Number(x || 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) }
+
+function exportData(){
+  const data = {settings,items,batches,purchases,sales}
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href=url; a.download='sunmi_pos_export.json'; a.click(); URL.revokeObjectURL(url)
+}
+function importData(){
+  const txt = prompt('الصق JSON هنا لاستيراد (سيستبدل البيانات الحالية). اكتب "موافق" لمتابعة الاستبدال مع وضع JSON في الحقل التالي.')
+  if(!txt) return
+  try{
+    const obj = JSON.parse(txt)
+    if(confirm('هل أنت متأكد؟ سيتم استبدال البيانات الحالية.')) {
+      settings = obj.settings || settings
+      items = obj.items || []
+      batches = obj.batches || []
+      purchases = obj.purchases || []
+      sales = obj.sales || []
+      persistAll(); renderAll(); alert('تم الاستيراد')
+    }
+  }catch(e){
+    alert('JSON غير صحيح: ' + e.message)
+  }
+}
+function clearAll(){
+  if(confirm('سيتم مسح كل البيانات من localStorage. التأكيد؟')){
+    localStorage.clear()
+    settings = {mode:'batch'}
+    items = []; batches = []; purchases = []; sales = []
+    persistAll(); renderAll()
+  }
+}
+
+function renderAll(){
+  fillItemSelects(); renderItems(); renderPurLines(); renderPurchases(); renderPurchaseReport(); renderSaleLines(); renderSales(); renderSalesReport()
+}
+renderAll()
+
+</script>
+</body>
+</html>
