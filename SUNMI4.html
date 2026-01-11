@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>نظام مطاعم - POS (Sunmi)</title>
+<style>
+:root{
+  --bg:#f4f7f9; --card:#fff; --muted:#6b7280; --accent:#0b6b63; --accent-2:#06a89a;
+  --head:#07353a; --head-bg:linear-gradient(180deg,#dff3f2,#e6fbf9); --row-even:#f0fbfa; --hover:rgba(6,168,154,0.08);
+  --danger:#b00020; --shadow:0 2px 6px rgba(10,20,25,0.06);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:"Noto Naskh Arabic",Tahoma,Arial;direction:rtl;background:var(--bg);color:#111}
+#sidebar_toggle_fab{position:fixed;left:12px;top:12px;z-index:1200;background:var(--accent);color:#fff;border:none;padding:12px 14px;border-radius:10px;box-shadow:var(--shadow);font-size:16px}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:linear-gradient(180deg,#063a3a,#095959);color:#fff;padding:14px;display:flex;flex-direction:column;gap:10px;z-index:1100;transition:transform .18s}
+.sidebar.collapsed{transform:translateX(-100%)}
+.sidebtn{background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.08);padding:12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:15px}
+.sidebtn:active{transform:scale(.995)}
+.content{margin-right:260px;padding:16px}
+.card{background:var(--card);padding:14px;border-radius:10px;box-shadow:var(--shadow);margin-bottom:14px}
+.row{display:flex;gap:10px;align-items:center}
+input,select,button,textarea{padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:15px}
+button{cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:8px;background:var(--card)}
+th,td{padding:10px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:center}
+th{background:var(--head-bg);color:var(--head);position:sticky;top:0;z-index:6}
+tbody tr:nth-child(odd){background:#fff}
+tbody tr:nth-child(even){background:var(--row-even)}
+tbody tr:hover{background:var(--hover);cursor:pointer}
+.small{font-size:13px;color:var(--muted)}
+.btn-primary{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:8px;font-size:15px}
+.btn-secondary{background:#f3f4f6;border:none;padding:10px 14px;border-radius:8px}
+.btn-danger{background:var(--danger);color:#fff;border:none;padding:10px 14px;border-radius:8px}
+.table-scroll{max-height:420px;overflow:auto;border-radius:8px}
+.flex-split{display:flex;gap:12px}
+.flex-split .left{flex:0 0 52%}
+.flex-split .right{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:18px;background:#111;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:1300}
+.summary-box{background:linear-gradient(90deg,#e6fbf2,#f1fff8);padding:8px;border-radius:6px;text-align:center;border:1px solid rgba(6,168,154,0.12)}
+@media(max-width:900px){.sidebar{display:none}.content{margin:0}.flex-split{flex-direction:column}#sidebar_toggle_fab{left:8px}}
+</style>
+</head>
+<body>
+<button id="sidebar_toggle_fab" title="قوائم">☰ قوائم</button>
+
+<div id="sidebar" class="sidebar" aria-label="الشريط الجانبي">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div><h3 style="margin:0">قوائم النظام</h3><div class="small">اختر صفحة</div></div>
+    <button id="sidebar_close" class="sidebtn" title="إغلاق">✕</button>
+  </div>
+
+  <button class="sidebtn" data-target="page_add_item"><span>1</span><strong>إضافة صنف</strong></button>
+  <button class="sidebtn" data-target="page_items_list"><span>2</span><strong>قائمة الأصناف</strong></button>
+  <button class="sidebtn" data-target="page_add_purchase"><span>3</span><strong>إضافة فاتورة مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_pur_list"><span>4</span><strong>قائمة مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_pur_report"><span>5</span><strong>تقرير مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_add_sale"><span>6</span><strong>إضافة فاتورة مبيعات</strong></button>
+  <button class="sidebtn" data-target="page_sale_list"><span>7</span><strong>قائمة مبيعات</strong></button>
+  <button class="sidebtn" data-target="page_sale_report"><span>8</span><strong>تقرير مبيعات</strong></button>
+
+  <div style="margin-top:auto"><div class="small">الوضع الحالي:</div><div id="side_mode" class="small" style="margin-top:8px;color:#fff;background:rgba(255,255,255,0.08);padding:6px 8px;border-radius:6px"></div></div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div class="content">
+  <h1>نظام مطاعم - POS (Sunmi)</h1>
+
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;gap:10px;align-items:center">
+      <label>وضع التكلفة</label>
+      <select id="mode"><option value="batch">دفعات (Batch)</option><option value="average">المتوسط المرجّح</option></select>
+      <span class="small">اختر أسلوب التكلفة</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="exportBtn" class="btn-secondary">تصدير</button>
+      <button id="importBtn" class="btn-secondary">استيراد</button>
+      <button id="clearBtn" class="btn-danger">مسح البيانات</button>
+    </div>
+  </div>
+
+  <!-- Page: Add Item -->
+  <section id="page_add_item" class="card page">
+    <h2>1- إضافة صنف</h2>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <input id="item_name" placeholder="اسم الصنف" style="min-width:180px"/>
+      <input id="item_unit" placeholder="الوحدة" style="width:120px"/>
+      <input id="item_cost" placeholder="التكلفة" type="number" step="0.01" style="width:120px"/>
+      <input id="item_price" placeholder="السعر" type="number" step="0.01" style="width:120px"/>
+      <input id="item_open_qty" placeholder="كمية افتتاحية" type="number" step="1" style="width:140px"/>
+      <button id="addItemBtn" class="btn-primary">حفظ الصنف</button>
+    </div>
+  </section>
+
+  <!-- Page: Items List -->
+  <section id="page_items_list" class="card page hidden">
+    <h2>2- قائمة الأصناف</h2>
+    <div class="row" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="search_items" placeholder="بحث اسم أو كود" />
+        <select id="sort_items"><option value="id.asc">رقم ↑</option><option value="id.desc">رقم ↓</option><option value="qty.desc">أعلى مخزون</option><option value="qty.asc">أقل مخزون</option><option value="cost.desc">أعلى تكلفة</option><option value="cost.asc">أقل تكلفة</option><option value="price.desc">أعلى سعر</option><option value="price.asc">أقل سعر</option></select>
+      </div>
+      <div class="small" id="items_count"></div>
+    </div>
+
+    <div class="table-scroll">
+      <table id="items_table"><thead><tr><th>قبل</th><th>ID</th><th>الاسم</th><th>الوحدة</th><th>التكلفة</th><th>السعر</th><th>فتح</th><th>مشتريات</th><th>مبيعات</th><th>المخزون</th><th>إجمالي القيمة</th><th>إجراءات</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- Page: Add Purchase (split) -->
+  <section id="page_add_purchase" class="card page hidden">
+    <h2>3- إضافة فاتورة مشتريات</h2>
+    <div class="row" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label>رقم الفاتورة</label><input id="pur_invoice_no" readonly style="width:140px"/>
+        <input id="pur_source" placeholder="المورد" />
+        <input id="pur_date" type="date" />
+        <input id="pur_note" placeholder="ملاحظة" />
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="pur_save_print" class="btn-primary">حفظ & طباعة</button>
+        <button id="pur_save" class="btn-secondary">حفظ</button>
+        <button id="pur_clear" class="btn-secondary">تفريغ</button>
+      </div>
+    </div>
+
+    <div class="flex-split" style="margin-top:12px">
+      <div class="left card" style="padding:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <button id="open_pur_items" class="btn-secondary">قائمة الأصناف</button>
+          <div class="small">اختر صنفًا أو اضغط صف في القائمة ليُنزل تلقائيًا</div>
+        </div>
+        <table>
+          <thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><select id="pur_item_select"></select></td>
+              <td><input id="pur_item_unit" disabled style="width:90px"/></td>
+              <td><input id="pur_item_cost" type="number" step="0.01" style="width:120px"/></td>
+              <td><input id="pur_item_qty" type="number" step="1" style="width:100px"/></td>
+              <td><input id="pur_item_total" readonly class="summary-box" style="width:140px"/></td>
+              <td><button id="pur_add_line" class="btn-primary">أضف</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="right card">
+        <h3>بنود الفاتورة</h3>
+        <div class="table-scroll">
+          <table id="pur_lines_table"><thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <div class="small">عدد الأصناف: <span id="pur_lines_count">0</span></div>
+          <div class="small">المجموع: <span id="pur_total">0.00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Page: Purchases List -->
+  <section id="page_pur_list" class="card page hidden">
+    <h2>4- قائمة المشتريات</h2>
+    <div class="row">
+      من: <input id="pur_filter_from" type="date"/> إلى: <input id="pur_filter_to" type="date"/>
+      <button id="pur_filter_btn" class="btn-secondary">فلتر</button>
+      <input id="pur_search" placeholder="بحث رقم/مورد"/>
+    </div>
+    <div class="small">عدد الفواتير: <span id="pur_count">0</span> — المجموع: <span id="pur_sum">0.00</span></div>
+    <div class="table-scroll">
+      <table id="purchases_table"><thead><tr><th>رقم</th><th>تاريخ</th><th>المورد</th><th>إجمالي</th><th>عرض</th><th>طباعة</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- Page: Purchases Report -->
+  <section id="page_pur_report" class="card page hidden">
+    <h2>5- تقرير مشتريات</h2>
+    <div class="row">
+      من: <input id="rep_pur_from" type="date"/> إلى: <input id="rep_pur_to" type="date"/>
+      <select id="rep_pur_sort"><option value="name.asc">اسم ↑</option><option value="qty.desc">أعلى كمية</option><option value="qty.asc">أقل كمية</option><option value="cost.desc">أعلى تكلفة</option><option value="cost.asc">أقل تكلفة</option><option value="total.desc">أعلى إجمالي</option><option value="total.asc">أقل إجمالي</option></select>
+      <button id="rep_pur_btn" class="btn-secondary">عرض</button>
+    </div>
+    <div class="small">عدد أصناف: <span id="rep_pur_count">0</span> — المجموع: <span id="rep_pur_sum">0.00</span></div>
+    <div class="table-scroll">
+      <table id="rep_pur_table"><thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- Page: Add Sale -->
+  <section id="page_add_sale" class="card page hidden">
+    <h2>6- مبيعات</h2>
+    <div class="row" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label>رقم الفاتورة</label><input id="sale_invoice_no" readonly style="width:140px"/>
+        <input id="sale_source" placeholder="العميل"/>
+        <input id="sale_date" type="date"/>
+        <input id="sale_note" placeholder="ملاحظة"/>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="sale_save_print" class="btn-primary">حفظ & طباعة</button>
+        <button id="sale_save" class="btn-secondary">حفظ</button>
+        <button id="sale_clear" class="btn-secondary">تفريغ</button>
+      </div>
+    </div>
+
+    <div class="flex-split" style="margin-top:12px">
+      <div class="left card" style="padding:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <button id="open_sale_items" class="btn-secondary">قائمة الأصناف</button>
+          <div class="small">اختر صنفًا أو اضغط صفًا من القائمة ليُنزل تلقائياً</div>
+        </div>
+        <table>
+          <thead><tr><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><select id="sale_item_select"></select></td>
+              <td><input id="sale_item_unit" disabled style="width:90px"/></td>
+              <td><input id="sale_item_price" type="number" step="0.01" style="width:120px"/></td>
+              <td><input id="sale_item_qty" type="number" step="1" style="width:100px"/></td>
+              <td><input id="sale_item_total" readonly class="summary-box" style="width:140px"/></td>
+              <td><button id="sale_add_line" class="btn-primary">أضف</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="right card">
+        <h3>بنود الفاتورة</h3>
+        <div class="table-scroll">
+          <table id="sale_lines_table"><thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <div class="small">عدد الأصناف: <span id="sale_lines_count">0</span></div>
+          <div class="small">المجموع: <span id="sale_total">0.00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Page: Sales List -->
+  <section id="page_sale_list" class="card page hidden">
+    <h2>7- قائمة المبيعات</h2>
+    <div class="row">
+      من: <input id="sale_filter_from" type="date"/> إلى: <input id="sale_filter_to" type="date"/>
+      <button id="sale_filter_btn" class="btn-secondary">فلتر</button>
+      <input id="sale_search" placeholder="بحث رقم/عميل"/>
+    </div>
+    <div class="small">عدد الفواتير: <span id="sale_count">0</span> — المجموع: <span id="sale_sum">0.00</span></div>
+    <div class="table-scroll">
+      <table id="sales_table"><thead><tr><th>رقم</th><th>تاريخ</th><th>العميل</th><th>إجمالي</th><th>الربح</th><th>عرض</th><th>طباعة</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- Page: Sales Report -->
+  <section id="page_sale_report" class="card page hidden">
+    <h2>8- تقرير مبيعات</h2>
+    <div class="row">
+      من: <input id="rep_sale_from" type="date"/> إلى: <input id="rep_sale_to" type="date"/>
+      <select id="rep_sale_sort"><option value="name.asc">اسم ↑</option><option value="qty.desc">أعلى كمية</option><option value="qty.asc">أقل كمية</option><option value="price.desc">أعلى سعر</option><option value="price.asc">أقل سعر</option><option value="total.desc">أعلى إجمالي</option><option value="total.asc">أقل إجمالي</option></select>
+      <button id="rep_sale_btn" class="btn-secondary">عرض</button>
+    </div>
+    <div class="small">عدد أصناف: <span id="rep_sale_count">0</span> — المجموع: <span id="rep_sale_sum">0.00</span></div>
+    <div class="table-scroll">
+      <table id="rep_sale_table"><thead><tr><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+</div>
+
+<!-- Modal items -->
+<div id="item_modal" class="modal" onclick="if(event.target.id==='item_modal') document.getElementById('item_modal').style.display='none'">
+  <div class="box" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>قائمة الأصناف</h3>
+      <div>
+        <input id="modal_search" placeholder="بحث..." />
+        <button id="modal_close" class="btn-secondary">إغلاق</button>
+      </div>
+    </div>
+    <div class="table-scroll" style="margin-top:8px">
+      <table id="modal_items_table"><thead><tr><th>ID</th><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>السعر</th><th>المخزون</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="small" style="margin-top:8px">اضغط على أي صف للاختيار والنزول تلقائياً.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // Simple POS for SUNMI: clean, single-file
+  const uid = prefix => prefix + '_' + Math.random().toString(36).slice(2,9)
+  const load = (k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
+  const save = (k,v)=>localStorage.setItem(k,JSON.stringify(v))
+
+  // state
+  let settings = load('pos_settings',{mode:'batch'})
+  let items = load('pos_items',[])
+  let batches = load('pos_batches',[])
+  let purchases = load('pos_purchases',[])
+  let sales = load('pos_sales',[])
+  let nextSaleNo = load('pos_nextSaleNo',1)
+  let nextPurNo = load('pos_nextPurNo',1)
+
+  const persist = ()=>{ save('pos_settings',settings); save('pos_items',items); save('pos_batches',batches); save('pos_purchases',purchases); save('pos_sales',sales); save('pos_nextSaleNo',nextSaleNo); save('pos_nextPurNo',nextPurNo) }
+
+  // UI helpers
+  const toast = document.getElementById('toast')
+  function showToast(txt,ms=3000){ toast.textContent=txt; toast.style.display='block'; clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.style.display='none',ms) }
+
+  function formatNum(x){ return Number(x||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) }
+
+  // invoice numbers
+  function setInvoiceNumbers(){
+    document.getElementById('sale_invoice_no').value = `S-${String(nextSaleNo).padStart(5,'0')}`
+    document.getElementById('pur_invoice_no').value = `P-${String(nextPurNo).padStart(5,'0')}`
+  }
+
+  // find item
+  function findItem(id){ return items.find(i=>i.id===id) || {id, name:id, unit:'', manualCost:0, price:0} }
+
+  // stock helpers
+  function stockQty(id){ return batches.filter(b=>b.itemId===id).reduce((s,b)=>s+(b.remainingQty||0),0) }
+  function stockVal(id){ return batches.filter(b=>b.itemId===id).reduce((s,b)=>s+(b.remainingQty||0)*(b.cost||0),0) }
+
+  // render items table
+  function renderItems(){
+    const tbody = document.querySelector('#items_table tbody'); tbody.innerHTML=''
+    const q = (document.getElementById('search_items').value||'').toLowerCase()
+    const sort = document.getElementById('sort_items').value||'id.asc'
+    let list = items.filter(it=> it.name.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
+    list.sort((a,b)=>{
+      const [k,dir]=sort.split('.'); let va,vb
+      if(k==='id'){va=a.id;vb=b.id}
+      else if(k==='qty'){va=stockQty(a.id);vb=stockQty(b.id)}
+      else if(k==='cost'){va=a.manualCost||0;vb=b.manualCost||0}
+      else {va=a.price||0;vb=b.price||0}
+      if(typeof va==='string') return dir==='asc'? va.localeCompare(vb): vb.localeCompare(va)
+      return dir==='asc'? va-vb: vb-va
+    })
+    for(const it of list){
+      const tr=document.createElement('tr')
+      tr.innerHTML = `<td>—</td><td>${it.id}</td><td>${it.name}</td><td>${it.unit}</td><td>${formatNum(it.manualCost)}${settings.mode==='average'?'<br><small>avg:'+formatNum(it.avgCost||0)+'</small>':''}</td><td>${formatNum(it.price)}</td><td>${it.openingQty||0}</td><td>${purchases.reduce((s,p)=>s+p.lines.filter(l=>l.itemId===it.id).reduce((ss,l)=>ss+l.qty,0),0)}</td><td>${sales.reduce((s,p)=>s+p.lines.filter(l=>l.itemId===it.id).reduce((ss,l)=>ss+l.qty,0),0)}</td><td>${stockQty(it.id)}</td><td>${formatNum(stockVal(it.id))}</td><td><button class="btn-secondary edit-item" data-id="${it.id}">تعديل</button> <button class="btn-secondary view-batches" data-id="${it.id}">دفعات</button></td>`
+      tbody.appendChild(tr)
+    }
+    document.getElementById('items_count').textContent = `عرض ${list.length} من ${items.length} أصناف`
+  }
+
+  // modal items
+  function renderModalItems(){
+    const tbody=document.querySelector('#modal_items_table tbody'); tbody.innerHTML=''
+    const q=(document.getElementById('modal_search').value||'').toLowerCase()
+    const list = items.filter(it=> it.name.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
+    for(const it of list){
+      const tr=document.createElement('tr')
+      tr.innerHTML = `<td>${it.id}</td><td>${it.name}</td><td>${it.unit}</td><td>${formatNum(it.manualCost)}</td><td>${formatNum(it.price)}</td><td>${stockQty(it.id)}</td>`
+      tr.addEventListener('click', ()=> {
+        const mode = document.getElementById('item_modal').dataset.mode
+        if(mode==='pur'){ document.getElementById('pur_item_select').value = it.id; document.getElementById('pur_item_unit').value = it.unit; document.getElementById('pur_item_cost').value = it.manualCost || ''; document.getElementById('pur_item_qty').value = 1; updatePurTotal() }
+        else { document.getElementById('sale_item_select').value = it.id; document.getElementById('sale_item_unit').value = it.unit; document.getElementById('sale_item_price').value = it.price || ''; document.getElementById('sale_item_qty').value = 1; updateSaleTotal() }
+        document.getElementById('item_modal').style.display='none'
+      })
+      tbody.appendChild(tr)
+    }
+  }
+
+  // populate selects
+  function populateSelects(){
+    for(const id of ['pur_item_select','sale_item_select']){
+      const sel=document.getElementById(id); sel.innerHTML=''
+      for(const it of items){ const opt=document.createElement('option'); opt.value=it.id; opt.textContent=`${it.name} [${it.id}]`; sel.appendChild(opt) }
+      sel.dispatchEvent(new Event('change'))
+    }
+  }
+
+  // purchase lines state
+  let purLines = []
+  function updatePurTotal(){
+    const cost=parseFloat(document.getElementById('pur_item_cost').value)||0
+    const qty=parseInt(document.getElementById('pur_item_qty').value)||0
+    document.getElementById('pur_item_total').value = formatNum(cost*qty)
+  }
+  function addPurLine(){
+    const itemId=document.getElementById('pur_item_select').value
+    const it=findItem(itemId); const cost=parseFloat(document.getElementById('pur_item_cost').value)||it.manualCost||0; const qty=parseInt(document.getElementById('pur_item_qty').value)||0
+    if(qty<=0){ alert('ادخل كمية أكبر من صفر'); return }
+    purLines.push({id:uid('pline'),itemId,unit:it.unit,cost,qty,total:cost*qty})
+    renderPurLines(); // clear input fields per request:
+    document.getElementById('pur_item_cost').value=''; document.getElementById('pur_item_qty').value=''; document.getElementById('pur_item_total').value=''
+  }
+  function renderPurLines(){
+    const tbody=document.querySelector('#pur_lines_table tbody'); tbody.innerHTML=''
+    purLines.forEach((l,i)=>{ const tr=document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${findItem(l.itemId).name}</td><td>${l.unit}</td><td>${formatNum(l.cost)}</td><td>${l.qty}</td><td>${formatNum(l.total)}</td><td><button class="btn-secondary rem-pur" data-id="${l.id}">حذف</button></td>`; tbody.appendChild(tr) })
+    document.getElementById('pur_lines_count').textContent = purLines.length
+    document.getElementById('pur_total').textContent = formatNum(purLines.reduce((s,l)=>s+l.total,0))
+  }
+
+  function removePurLine(id){ purLines = purLines.filter(l=>l.id!==id); renderPurLines() }
+
+  function savePurchase(printAfter=false){
+    if(purLines.length===0){ alert('لا توجد بنود'); return }
+    const invoiceNo=`P-${String(nextPurNo).padStart(5,'0')}`
+    const source=(document.getElementById('pur_source').value||'').trim()
+    const date=document.getElementById('pur_date').value || new Date().toISOString().slice(0,10)
+    const note=(document.getElementById('pur_note').value||'').trim()
+    const pur={id:uid('pur'),invoiceNo,source,date,note,lines:JSON.parse(JSON.stringify(purLines)),total:purLines.reduce((s,l)=>s+l.total,0)}
+    for(const l of pur.lines){
+      const it=findItem(l.itemId)
+      if(settings.mode==='batch'){ batches.push({id:uid('batch'),itemId:l.itemId,qty:l.qty,remainingQty:l.qty,cost:l.cost,type:'purchase',date:new Date().toISOString(),note:`pur:${invoiceNo}`}) }
+      else { const curQ=stockQty(l.itemId), curV=stockVal(l.itemId), newQ=curQ+l.qty, newV=curV+l.total; it.avgCost = newQ>0? newV/newQ : l.cost; batches.push({id:uid('batch'),itemId:l.itemId,qty:l.qty,remainingQty:l.qty,cost:it.avgCost,type:'purchase',date:new Date().toISOString(),note:`pur:${invoiceNo}`}) }
+    }
+    purchases.push(pur); nextPurNo++; persist(); // clear fields and lines
+    purLines=[]; renderPurLines()
+    document.getElementById('pur_source').value=''; document.getElementById('pur_date').value=''; document.getElementById('pur_note').value=''
+    document.getElementById('pur_item_cost').value=''; document.getElementById('pur_item_qty').value=''; document.getElementById('pur_item_total').value=''
+    setInvoiceNumbers(); renderPurchases(); renderItems(); populateSelects(); renderModalItems()
+    showToast('تم حفظ الفاتورة',3000)
+    if(printAfter) setTimeout(()=> printPurchase(pur.id),200)
+  }
+
+  function renderPurchases(){
+    const tbody=document.querySelector('#purchases_table tbody'); tbody.innerHTML=''
+    const q=(document.getElementById('pur_search').value||'').toLowerCase()
+    const from=document.getElementById('pur_filter_from').value, to=document.getElementById('pur_filter_to').value
+    const list = purchases.filter(p=>{
+      if(q && !(p.invoiceNo.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q))) return false
+      if(from && p.date < from) return false
+      if(to && p.date > to) return false
+      return true
+    })
+    let sum=0
+    for(const p of list){
+      sum += p.total
+      const tr=document.createElement('tr')
+      tr.innerHTML = `<td>${p.invoiceNo}</td><td>${p.date}</td><td>${p.source}</td><td>${formatNum(p.total)}</td><td><button class="btn-secondary view-pur" data-id="${p.id}">عرض</button></td><td><button class="btn-secondary print-pur" data-id="${p.id}">طباعة</button></td>`
+      tbody.appendChild(tr)
+    }
+    document.getElementById('pur_count').textContent=list.length
+    document.getElementById('pur_sum').textContent=formatNum(sum)
+  }
+
+  function printPurchase(id){
+    const p=purchases.find(x=>x.id===id); if(!p) return
+    const w=window.open('','_blank'); let html=`<html><head><meta charset="utf-8"><title>فاتورة ${p.invoiceNo}</title><style>body{font-family:Arial;direction:rtl}table{width:100%;border-collapse:collapse}th,td{padding:6px;border:1px solid #ccc;text-align:center}</style></head><body>`
+    html += `<h2>فاتورة مشتريات #${p.invoiceNo}</h2><div>التاريخ:${p.date} — المورد:${p.source}</div><table><thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>`
+    for(const l of p.lines){ const it=findItem(l.itemId); html+=`<tr><td>${it.name}</td><td>${l.unit}</td><td>${formatNum(l.cost)}</td><td>${l.qty}</td><td>${formatNum(l.total)}</td></tr>` }
+    html += `</tbody></table><h3>الإجمالي: ${formatNum(p.total)}</h3></body></html>`
+    w.document.write(html); w.document.close(); setTimeout(()=>w.print(),300)
+  }
+
+  // sales
+  let saleLines = []
+  function updateSaleTotal(){ const price=parseFloat(document.getElementById('sale_item_price').value)||0; const qty=parseInt(document.getElementById('sale_item_qty').value)||0; document.getElementById('sale_item_total').value = formatNum(price*qty) }
+  function addSaleLine(){
+    const itemId=document.getElementById('sale_item_select').value; const it=findItem(itemId)
+    const price=parseFloat(document.getElementById('sale_item_price').value)||it.price||0; const qty=parseInt(document.getElementById('sale_item_qty').value)||0
+    if(qty<=0){ alert('ادخل كمية أكبر من صفر'); return }
+    saleLines.push({id:uid('sline'),itemId,unit:it.unit,price,qty,total:price*qty})
+    renderSaleLines()
+    document.getElementById('sale_item_price').value=''; document.getElementById('sale_item_qty').value=''; document.getElementById('sale_item_total').value=''
+  }
+  function renderSaleLines(){
+    const tbody=document.querySelector('#sale_lines_table tbody'); tbody.innerHTML=''
+    for(let i=0;i<saleLines.length;i++){ const l=saleLines[i]; const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${findItem(l.itemId).name}</td><td>${l.unit}</td><td>${formatNum(l.price)}</td><td>${l.qty}</td><td>${formatNum(l.total)}</td><td><button class="btn-secondary rem-sale" data-id="${l.id}">حذف</button></td>`; tbody.appendChild(tr) }
+    document.getElementById('sale_lines_count').textContent = saleLines.length
+    document.getElementById('sale_total').textContent = formatNum(saleLines.reduce((s,l)=>s+l.total,0))
+  }
+  function removeSaleLine(id){ saleLines = saleLines.filter(l=>l.id!==id); renderSaleLines() }
+
+  function saveSale(printAfter=false){
+    if(saleLines.length===0){ alert('لا توجد بنود'); return }
+    const invoiceNo=`S-${String(nextSaleNo).padStart(5,'0')}`
+    const source=(document.getElementById('sale_source').value||'').trim()
+    const date=document.getElementById('sale_date').value || new Date().toISOString().slice(0,10)
+    const note=(document.getElementById('sale_note').value||'').trim()
+    const s={id:uid('sale'),invoiceNo,source,date,note,lines:[],total:0,costTotal:0}
+    for(const l of saleLines){
+      let remaining=l.qty; let costLine=0
+      if(settings.mode==='batch'){
+        const itemBatches = batches.filter(b=>b.itemId===l.itemId && b.remainingQty>0).sort((a,b)=> new Date(a.date)-new Date(b.date))
+        for(const b of itemBatches){ if(remaining<=0) break; const take=Math.min(b.remainingQty,remaining); b.remainingQty-=take; remaining-=take; costLine+=take*b.cost }
+        if(remaining>0){ const it=findItem(l.itemId); const fallback=it.avgCost||it.manualCost||0; batches.push({id:uid('batch'),itemId:l.itemId,qty:-remaining,remainingQty:-remaining,cost:fallback,type:'negative',date:new Date().toISOString(),note:`short:${invoiceNo}`}); costLine+=remaining*fallback; remaining=0 }
+      } else {
+        const it=findItem(l.itemId); const avg=it.avgCost||it.manualCost||0; costLine = l.qty * avg
+        let rem=l.qty; const itemBatches = batches.filter(b=>b.itemId===l.itemId && b.remainingQty>0).sort((a,b)=> new Date(a.date)-new Date(b.date))
+        for(const b of itemBatches){ if(rem<=0) break; const take=Math.min(b.remainingQty,rem); b.remainingQty-=take; rem-=take }
+        if(rem>0) batches.push({id:uid('batch'),itemId:l.itemId,qty:-rem,remainingQty:-rem,cost:avg,type:'negative',date:new Date().toISOString(),note:`short:${invoiceNo}`})
+      }
+      s.lines.push({...l,costForThisLine:costLine}); s.total+=l.total; s.costTotal+=costLine
+    }
+    sales.push(s); nextSaleNo++; persist()
+    saleLines=[]; renderSaleLines()
+    document.getElementById('sale_source').value=''; document.getElementById('sale_date').value=''; document.getElementById('sale_note').value=''
+    document.getElementById('sale_item_price').value=''; document.getElementById('sale_item_qty').value=''; document.getElementById('sale_item_total').value=''
+    setInvoiceNumbers(); renderSales(); renderItems(); populateSelects(); renderModalItems()
+    showToast('تم حفظ الفاتورة',3000)
+    if(printAfter) setTimeout(()=>printSale(s.id),200)
+  }
+
+  function renderSales(){
+    const tbody=document.querySelector('#sales_table tbody'); tbody.innerHTML=''
+    const q=(document.getElementById('sale_search').value||'').toLowerCase()
+    const from=document.getElementById('sale_filter_from').value, to=document.getElementById('sale_filter_to').value
+    const list = sales.filter(p=>{ if(q && !(p.invoiceNo.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q))) return false; if(from && p.date<from) return false; if(to && p.date>to) return false; return true })
+    let sum=0
+    for(const p of list){ sum+=p.total; const tr=document.createElement('tr'); tr.innerHTML=`<td>${p.invoiceNo}</td><td>${p.date}</td><td>${p.source}</td><td>${formatNum(p.total)}</td><td>${formatNum(p.total - p.costTotal)}</td><td><button class="btn-secondary view-sale" data-id="${p.id}">عرض</button></td><td><button class="btn-secondary print-sale" data-id="${p.id}">طباعة</button></td>`; tbody.appendChild(tr) }
+    document.getElementById('sale_count').textContent=list.length; document.getElementById('sale_sum').textContent=formatNum(sum)
+  }
+
+  function printSale(id){
+    const s = sales.find(x=>x.id===id); if(!s) return
+    const w=window.open('','_blank'); let html=`<html><head><meta charset="utf-8"><title>فاتورة ${s.invoiceNo}</title><style>body{font-family:Arial;direction:rtl}table{width:100%;border-collapse:collapse}th,td{padding:6px;border:1px solid #ccc;text-align:center}</style></head><body>`
+    html+=`<h2>فاتورة مبيعات #${s.invoiceNo}</h2><div>التاريخ:${s.date} — العميل:${s.source}</div><table><thead><tr><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>`
+    for(const l of s.lines){ const it=findItem(l.itemId); html+=`<tr><td>${it.name}</td><td>${l.unit}</td><td>${formatNum(l.price)}</td><td>${l.qty}</td><td>${formatNum(l.total)}</td></tr>` }
+    html+=`</tbody></table><h3>الإجمالي: ${formatNum(s.total)}</h3></body></html>`
+    w.document.write(html); w.document.close(); setTimeout(()=>w.print(),300)
+  }
+
+  // reports
+  function renderPurchaseReport(){ const from=document.getElementById('rep_pur_from').value, to=document.getElementById('rep_pur_to').value, sort=document.getElementById('rep_pur_sort').value
+    const map = {}
+    for(const p of purchases){ if(from && p.date<from) continue; if(to && p.date>to) continue; for(const l of p.lines){ if(!map[l.itemId]) map[l.itemId]={qty:0,total:0,cost:l.cost,item:findItem(l.itemId)}; map[l.itemId].qty+=l.qty; map[l.itemId].total+=l.total } }
+    let arr=Object.values(map)
+    arr.sort((a,b)=>{const [k,d]=sort.split('.'); if(k==='name') return a.item.name.localeCompare(b.item.name); if(k==='qty') return d==='desc'? b.qty-a.qty: a.qty-b.qty; if(k==='cost') return d==='desc'? b.cost-a.cost: a.cost-b.cost; if(k==='total') return d==='desc'? b.total-a.total: a.total-b.total; return 0})
+    const tbody=document.querySelector('#rep_pur_table tbody'); tbody.innerHTML=''; let sum=0
+    for(const r of arr){ const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.item.name}</td><td>${r.item.unit}</td><td>${formatNum(r.cost)}</td><td>${r.qty}</td><td>${formatNum(r.total)}</td>`; tbody.appendChild(tr); sum+=r.total }
+    document.getElementById('rep_pur_count').textContent=arr.length; document.getElementById('rep_pur_sum').textContent=formatNum(sum)
+  }
+
+  function renderSalesReport(){ const from=document.getElementById('rep_sale_from').value, to=document.getElementById('rep_sale_to').value, sort=document.getElementById('rep_sale_sort').value
+    const map = {}
+    for(const s of sales){ if(from && s.date<from) continue; if(to && s.date>to) continue; for(const l of s.lines){ if(!map[l.itemId]) map[l.itemId]={qty:0,total:0,price:l.price,item:findItem(l.itemId)}; map[l.itemId].qty+=l.qty; map[l.itemId].total+=l.total } }
+    let arr=Object.values(map)
+    arr.sort((a,b)=>{const [k,d]=sort.split('.'); if(k==='name') return a.item.name.localeCompare(b.item.name); if(k==='qty') return d==='desc'? b.qty-a.qty: a.qty-b.qty; if(k==='price') return d==='desc'? b.price-a.price: a.price-b.price; if(k==='total') return d==='desc'? b.total-a.total: a.total-b.total; return 0})
+    const tbody=document.querySelector('#rep_sale_table tbody'); tbody.innerHTML=''; let sum=0,costSum=0
+    for(const r of arr){ const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.item.name}</td><td>${r.item.unit}</td><td>${formatNum(r.price)}</td><td>${r.qty}</td><td>${formatNum(r.total)}</td>`; tbody.appendChild(tr); sum+=r.total }
+    for(const s of sales){ if(from && s.date<from) continue; if(to && s.date>to) continue; costSum += s.costTotal||0 }
+    document.getElementById('rep_sale_count').textContent=arr.length; document.getElementById('rep_sale_sum').textContent=formatNum(sum); document.getElementById('rep_sale_cost_sum').textContent=formatNum(costSum); document.getElementById('rep_sale_profit').textContent=formatNum(sum-costSum)
+  }
+
+  // UI wiring
+  function bind(){
+    // sidebar toggles
+    document.getElementById('sidebar_toggle_fab').addEventListener('click', ()=>document.getElementById('sidebar').classList.toggle('collapsed'))
+    document.getElementById('sidebar_close').addEventListener('click', ()=>document.getElementById('sidebar').classList.add('collapsed'))
+    document.querySelectorAll('.sidebtn[data-target]').forEach(btn=>btn.addEventListener('click', ()=>{ document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden')); document.getElementById(btn.dataset.target).classList.remove('hidden'); document.getElementById('sidebar').classList.add('collapsed'); window.scrollTo({top:0,behavior:'smooth'}) }))
+
+    // mode set
+    document.getElementById('mode').value = settings.mode
+    document.getElementById('mode').addEventListener('change', e=>{ settings.mode = e.target.value; save('pos_settings',settings); document.getElementById('side_mode').textContent = settings.mode })
+
+    // add item
+    document.getElementById('addItemBtn').addEventListener('click', ()=>{
+      const name=(document.getElementById('item_name').value||'').trim()
+      if(!name){ alert('ادخل اسم الصنف'); return }
+      const unit=(document.getElementById('item_unit').value||'').trim()||'pcs'
+      const cost=parseFloat(document.getElementById('item_cost').value)||0
+      const price=parseFloat(document.getElementById('item_price').value)||0
+      const openQty=parseInt(document.getElementById('item_open_qty').value)||0
+      const id=uid('item'); items.push({id,name,unit,manualCost:cost,price,openingQty:openQty,openingValue:openQty*cost,avgCost:cost})
+      if(openQty>0) batches.push({id:uid('batch'),itemId:id,qty:openQty,remainingQty:openQty,cost, type:'opening', date:new Date().toISOString(), note:'opening'})
+      persist(); // clear fields after save
+      document.getElementById('item_name').value=''; document.getElementById('item_unit').value=''; document.getElementById('item_cost').value=''; document.getElementById('item_price').value=''; document.getElementById('item_open_qty').value=''
+      populateSelects(); renderItems(); renderModalItems()
+      showToast('تم حفظ الصنف',3000)
+    })
+
+    // items list events (edit / view batches)
+    document.querySelector('#items_table tbody').addEventListener('click', e=>{
+      const edit = e.target.closest('.edit-item'); if(edit){ const id=edit.dataset.id; const it = items.find(i=>i.id===id); if(!it) return; const n=prompt('اسم الصنف',it.name); if(n===null) return; const u=prompt('الوحدة',it.unit); if(u===null) return; const c=parseFloat(prompt('التكلفة',it.manualCost||0)); const p=parseFloat(prompt('السعر',it.price||0)); it.name=n||it.name; it.unit=u||it.unit; it.manualCost=isNaN(c)?it.manualCost:c; it.price=isNaN(p)?it.price:p; persist(); renderItems(); populateSelects(); renderModalItems(); return }
+      const batchesBtn = e.target.closest('.view-batches'); if(batchesBtn){ const id=batchesBtn.dataset.id; const list = batches.filter(b=>b.itemId===id); if(list.length===0) return alert('لا دفعات'); alert(list.map(b=>`${b.id} | ${b.type} | ${new Date(b.date).toLocaleDateString()} | qty:${b.qty} | remain:${b.remainingQty} | cost:${formatNum(b.cost)}`).join('\n')); return }
+    })
+
+    // modal open/close
+    document.getElementById('open_pur_items').addEventListener('click', ()=>{ document.getElementById('item_modal').style.display='flex'; document.getElementById('item_modal').dataset.mode='pur'; document.getElementById('modal_search').value=''; renderModalItems() })
+    document.getElementById('open_sale_items').addEventListener('click', ()=>{ document.getElementById('item_modal').style.display='flex'; document.getElementById('item_modal').dataset.mode='sale'; document.getElementById('modal_search').value=''; renderModalItems() })
+    document.getElementById('modal_close').addEventListener('click', ()=>document.getElementById('item_modal').style.display='none')
+    document.getElementById('modal_search').addEventListener('input', renderModalItems)
+
+    // purchase inputs
+    document.getElementById('pur_item_select').addEventListener('change', function(){ const it=findItem(this.value); document.getElementById('pur_item_unit').value = it.unit; if(!document.getElementById('pur_item_cost').value) document.getElementById('pur_item_cost').value = it.manualCost||''; updatePurTotal(); })
+    document.getElementById('pur_item_cost').addEventListener('input', updatePurTotal)
+    document.getElementById('pur_item_qty').addEventListener('input', updatePurTotal)
+    document.getElementById('pur_add_line').addEventListener('click', addPurLine)
+    document.getElementById('pur_lines_table').addEventListener('click', e=>{ const btn=e.target.closest('.rem-pur'); if(btn) removePurLine(btn.dataset.id) })
+    document.getElementById('pur_save').addEventListener('click', ()=>savePurchase(false))
+    document.getElementById('pur_save_print').addEventListener('click', ()=>savePurchase(true))
+    document.getElementById('pur_clear').addEventListener('click', ()=>{ document.getElementById('pur_source').value=''; document.getElementById('pur_date').value=''; document.getElementById('pur_note').value=''; document.getElementById('pur_item_cost').value=''; document.getElementById('pur_item_qty').value=''; document.getElementById('pur_item_total').value=''; purLines=[]; renderPurLines() })
+    document.getElementById('pur_search').addEventListener('input', renderPurchases)
+    document.getElementById('pur_filter_btn').addEventListener('click', renderPurchases)
+    document.getElementById('purchases_table').addEventListener('click', e=>{ const v=e.target.closest('.view-pur'); if(v){ const p=purchases.find(x=>x.id===v.dataset.id); if(p) alert(`فاتورة ${p.invoiceNo}\nالتاريخ:${p.date}\nالمجموع:${formatNum(p.total)}\n${p.lines.map(l=>findItem(l.itemId).name+' | '+l.qty+' | '+formatNum(l.total)).join('\n')}`) }; const pr=e.target.closest('.print-pur'); if(pr) printPurchase(pr.dataset.id) })
+
+    // sale inputs
+    document.getElementById('sale_item_select').addEventListener('change', function(){ const it=findItem(this.value); document.getElementById('sale_item_unit').value = it.unit; if(!document.getElementById('sale_item_price').value) document.getElementById('sale_item_price').value = it.price||''; updateSaleTotal() })
+    document.getElementById('sale_item_price').addEventListener('input', updateSaleTotal)
+    document.getElementById('sale_item_qty').addEventListener('input', updateSaleTotal)
+    document.getElementById('sale_add_line').addEventListener('click', addSaleLine)
+    document.getElementById('sale_lines_table').addEventListener('click', e=>{ const btn=e.target.closest('.rem-sale'); if(btn) removeSaleLine(btn.dataset.id) })
+    document.getElementById('sale_save').addEventListener('click', ()=>saveSale(false))
+    document.getElementById('sale_save_print').addEventListener('click', ()=>saveSale(true))
+    document.getElementById('sale_clear').addEventListener('click', ()=>{ document.getElementById('sale_source').value=''; document.getElementById('sale_date').value=''; document.getElementById('sale_note').value=''; document.getElementById('sale_item_price').value=''; document.getElementById('sale_item_qty').value=''; document.getElementById('sale_item_total').value=''; saleLines=[]; renderSaleLines() })
+    document.getElementById('sale_search').addEventListener('input', renderSales)
+    document.getElementById('sale_filter_btn').addEventListener('click', renderSales)
+    document.getElementById('sales_table').addEventListener('click', e=>{ const v=e.target.closest('.view-sale'); if(v){ const s=sales.find(x=>x.id===v.dataset.id); if(s) alert(`فاتورة ${s.invoiceNo}\nالتاريخ:${s.date}\nإجمالي:${formatNum(s.total)}\n${s.lines.map(l=>findItem(l.itemId).name+' | '+l.qty+' | '+formatNum(l.total)).join('\n')}`) }; const pr=e.target.closest('.print-sale'); if(pr) printSale(pr.dataset.id) })
+
+    // reports
+    document.getElementById('rep_pur_btn').addEventListener('click', renderPurchaseReport)
+    document.getElementById('rep_sale_btn').addEventListener('click', renderSalesReport)
+
+    // export/import/clear
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      const data={settings,items,batches,purchases,sales,nextSaleNo,nextPurNo}
+      const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='pos_export.json'; a.click(); URL.revokeObjectURL(url)
+    })
+    document.getElementById('importBtn').addEventListener('click', ()=>{
+      const txt=prompt('الصق JSON هنا للاستيراد'); if(!txt) return
+      try{ const obj=JSON.parse(txt); if(confirm('استيراد سيستبدل البيانات. متأكد؟')){ settings=obj.settings||settings; items=obj.items||[]; batches=obj.batches||[]; purchases=obj.purchases||[]; sales=obj.sales||[]; nextSaleNo=obj.nextSaleNo||nextSaleNo; nextPurNo=obj.nextPurNo||nextPurNo; persist(); refreshAll(); showToast('تم الاستيراد',3000) } }catch(e){ alert('JSON غير صالح: '+e.message) }
+    })
+    document.getElementById('clearBtn').addEventListener('click', ()=>{ if(confirm('سيتم مسح كل البيانات. تأكيد؟')){ localStorage.clear(); settings={mode:'batch'}; items=[]; batches=[]; purchases=[]; sales=[]; nextSaleNo=1; nextPurNo=1; persist(); refreshAll(); showToast('تم المسح',3000) } })
+  } // bind
+
+  // utility refresh
+  function refreshAll(){ populateSelects(); renderItems(); renderModalItems(); renderPurLines(); renderPurchases(); renderPurchaseReport(); renderSaleLines(); renderSales(); renderSalesReport(); setInvoiceNumbers(); document.getElementById('side_mode').textContent = settings.mode }
+
+  // bind UI and init
+  bind(); refreshAll(); persist()
+})();
+</script>
+</body>
+</html>
