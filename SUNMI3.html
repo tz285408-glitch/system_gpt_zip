@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>نظام مطاعم - POS (Sunmi) — نظيف</title>
+<style>
+  :root{
+    --bg:#f4f7f9;
+    --card:#ffffff;
+    --muted:#6b7280;
+    --accent:#0b6b63;
+    --accent-2:#06a89a;
+    --table-head:#07353a;
+    --table-head-bg: linear-gradient(180deg,#dff3f2,#e6fbf9);
+    --row-even:#f0fbfa;
+    --row-hover: rgba(6,168,154,0.08);
+    --danger:#b00020;
+    --shadow: 0 2px 6px rgba(10,20,25,0.06);
+  }
+  *{box-sizing:border-box}
+  body{font-family:"Noto Naskh Arabic", Tahoma, Arial; direction:rtl; margin:0; background:var(--bg); color:#111}
+  .sidebar{position:fixed; left:0; top:0; bottom:0; width:220px; background:linear-gradient(180deg,#063a3a,#095959); color:#fff; padding:12px; display:flex; flex-direction:column; gap:8px; z-index:900; transition:transform .18s}
+  .sidebar.collapsed{transform:translateX(-100%)}
+  .sidebtn{background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.08); padding:10px;border-radius:6px; text-align:right; cursor:pointer; display:flex; justify-content:space-between; align-items:center}
+  .content{margin-right:240px; padding:14px}
+  .card{background:var(--card);padding:12px;border-radius:8px;box-shadow:var(--shadow);margin-bottom:12px}
+  .row{display:flex;gap:8px;align-items:center}
+  input,select,button,textarea{padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:14px}
+  table{width:100%;border-collapse:collapse;margin-top:8px;background:var(--card)}
+  th,td{padding:10px;border-bottom:1px solid rgba(0,0,0,0.06); text-align:center}
+  th{background:var(--table-head-bg); color:var(--table-head); position:sticky; top:0; z-index:6}
+  tbody tr:nth-child(odd){background:#fff}
+  tbody tr:nth-child(even){background:var(--row-even)}
+  tbody tr:hover{background:var(--row-hover); cursor:pointer}
+  .small{font-size:12px;color:var(--muted)}
+  .badge{background:var(--accent);color:#fff;padding:6px 10px;border-radius:999px}
+  .modal{position:fixed;inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; z-index:950}
+  .modal .box{width:94%; max-width:1100px; max-height:88%; overflow:auto; border-radius:8px; padding:12px; background:var(--card)}
+  .table-scroll{max-height:420px; overflow:auto; border-radius:6px}
+  .btn-primary{background:var(--accent); color:#fff; border:none; padding:8px 12px; border-radius:6px}
+  .btn-secondary{background:#f3f4f6;border:none;padding:8px 12px;border-radius:6px}
+  .btn-danger{background:var(--danger); color:#fff;border:none;padding:8px 12px;border-radius:6px}
+  .flex-split{display:flex; gap:12px}
+  .flex-split .left{flex:0 0 52%}
+  .flex-split .right{flex:1}
+  .toast{position:fixed; left:50%; transform:translateX(-50%); top:20px; background:#111; color:#fff; padding:10px 16px; border-radius:8px; display:none; z-index:1000}
+  #sidebar_toggle_fab{position:fixed; left:12px; top:12px; z-index:1100; background:var(--accent); color:#fff; border:none; padding:10px 12px; border-radius:8px; box-shadow:var(--shadow); cursor:pointer}
+  .summary-box{background:linear-gradient(90deg,#e6fbf2,#f1fff8); border:1px solid rgba(6,168,154,0.12); padding:6px; border-radius:6px; text-align:center}
+  @media (max-width:900px){ .sidebar{display:none} .content{margin:0} .flex-split{flex-direction:column} #sidebar_toggle_fab{left:8px} }
+</style>
+</head>
+<body>
+
+<button id="sidebar_toggle_fab" title="إظهار/إخفاء الشريط">☰ قوائم</button>
+
+<div id="sidebar" class="sidebar" aria-label="الشريط الجانبي">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <h3 style="margin:0">قوائم النظام</h3>
+      <div class="small">اختر صفحة</div>
+    </div>
+    <button id="sidebar_close" class="sidebtn" title="إخفاء">✕</button>
+  </div>
+
+  <button class="sidebtn" data-target="page_add_item"><span>1</span><strong>إضافة صنف</strong></button>
+  <button class="sidebtn" data-target="page_items_list"><span>2</span><strong>قائمة الأصناف</strong></button>
+  <button class="sidebtn" data-target="page_add_purchase"><span>3</span><strong>إضافة فاتورة مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_pur_list"><span>4</span><strong>قائمة مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_pur_report"><span>5</span><strong>تقرير مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_add_sale"><span>6</span><strong>إضافة فاتورة مبيعات</strong></button>
+  <button class="sidebtn" data-target="page_sale_list"><span>7</span><strong>قائمة مبيعات</strong></button>
+  <button class="sidebtn" data-target="page_sale_report"><span>8</span><strong>تقرير مبيعات</strong></button>
+
+  <div style="margin-top:auto">
+    <div class="small">الوضع الحالي:</div>
+    <div id="side_mode" class="badge" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div class="content">
+  <h1>نظام مطاعم - POS (Sunmi) — مرتب وخالي من الأخطاء</h1>
+
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;gap:10px;align-items:center">
+      <label>وضع التكلفة:</label>
+      <select id="mode">
+        <option value="batch">دفعات (Batch)</option>
+        <option value="average">المتوسط المرجّح</option>
+      </select>
+      <span class="small">اختر كيفية حساب التكلفة</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="exportBtn" class="btn-secondary">تصدير</button>
+      <button id="importBtn" class="btn-secondary">استيراد</button>
+      <button id="clearBtn" class="btn-danger">مسح كل البيانات</button>
+    </div>
+  </div>
+
+  <!-- Pages -->
+  <section id="page_add_item" class="card page">
+    <h2>1- إضافة صنف جديد</h2>
+    <div class="row">
+      <input id="item_name" placeholder="اسم الصنف" />
+      <input id="item_unit" placeholder="الوحدة" />
+      <input id="item_cost" placeholder="التكلفة الافتراضية" type="number" step="0.01" />
+      <input id="item_price" placeholder="السعر" type="number" step="0.01" />
+      <input id="item_open_qty" placeholder="كمية أول المدة" type="number" step="1" />
+      <button id="addItemBtn" class="btn-primary">إضافة صنف</button>
+    </div>
+    <div class="small">ستظهر رسالة "تم حفظ الصنف" عند الإضافة.</div>
+  </section>
+
+  <section id="page_items_list" class="card page hidden">
+    <h2>2- قائمة الأصناف</h2>
+    <div class="row" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="search_items" placeholder="بحث باسم الصنف أو رقم التعريف" />
+        <select id="sort_items">
+          <option value="id.asc">رقم ↑</option><option value="id.desc">رقم ↓</option>
+          <option value="qty.desc">أعلى مخزون</option><option value="qty.asc">أقل مخزون</option>
+          <option value="cost.desc">أعلى تكلفة</option><option value="cost.asc">أقل تكلفة</option>
+          <option value="price.desc">أعلى سعر</option><option value="price.asc">أقل سعر</option>
+        </select>
+      </div>
+      <div class="small" id="items_count"></div>
+    </div>
+
+    <div class="table-scroll">
+      <table id="items_table" aria-describedby="items_count">
+        <thead>
+          <tr>
+            <th>قبل</th><th>ID</th><th>الاسم</th><th>الوحدة</th><th>التكلفة</th><th>السعر</th><th>فتح</th><th>مشتريات</th><th>مبيعات</th><th>المخزون</th><th>إجمالي القيمة</th><th>إجراءات</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="page_add_purchase" class="card page hidden">
+    <h2>3- إضافة فاتورة مشتريات</h2>
+    <div class="row" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label>رقم الفاتورة</label><input id="pur_invoice_no" readonly />
+        <input id="pur_source" placeholder="المورد" />
+        <input id="pur_date" type="date" />
+        <input id="pur_note" placeholder="ملاحظة" />
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="pur_save_print" class="btn-primary">حفظ وطباعـة</button>
+        <button id="pur_save" class="btn-secondary">حفظ</button>
+        <button id="pur_clear" class="btn-secondary">تفريغ الحقول</button>
+      </div>
+    </div>
+
+    <div class="flex-split" style="margin-top:12px">
+      <div class="left card" style="padding:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <button id="open_pur_items" class="btn-secondary">عرض الأصناف</button>
+          <div class="small">اختر صنفًا من القائمة أو من المنسدلة ثم أدخل الكمية واضغط "أضف".</div>
+        </div>
+
+        <table>
+          <thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><select id="pur_item_select"></select></td>
+              <td><input id="pur_item_unit" disabled /></td>
+              <td><input id="pur_item_cost" type="number" step="0.01" /></td>
+              <td><input id="pur_item_qty" type="number" step="1" /></td>
+              <td><input id="pur_item_total" readonly class="summary-box" /></td>
+              <td><button id="pur_add_line" class="btn-primary">أضف للصنف</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="right card">
+        <h3>بنود الفاتورة</h3>
+        <div class="table-scroll">
+          <table id="pur_lines_table">
+            <thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <div class="small">عدد الأصناف: <span id="pur_lines_count">0</span></div>
+          <div class="small">المجموع: <span id="pur_total">0.00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="page_pur_list" class="card page hidden">
+    <h2>4- قائمة فواتير المشتريات</h2>
+    <div class="row">
+      من: <input id="pur_filter_from" type="date" /> إلى: <input id="pur_filter_to" type="date" />
+      <button id="pur_filter_btn" class="btn-secondary">فلتر</button>
+      <input id="pur_search" placeholder="بحث رقم/مورد" />
+    </div>
+    <div class="small">عدد الفواتير: <span id="pur_count">0</span> — المجموع: <span id="pur_sum">0.00</span></div>
+    <div class="table-scroll">
+      <table id="purchases_table">
+        <thead><tr><th>رقم</th><th>تاريخ</th><th>المورد</th><th>إجمالي</th><th>عرض</th><th>طباعة</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="page_pur_report" class="card page hidden">
+    <h2>5- تقرير مشتريات (حسب الأصناف)</h2>
+    <div class="row">
+      من: <input id="rep_pur_from" type="date" /> إلى: <input id="rep_pur_to" type="date" />
+      <select id="rep_pur_sort"><option value="name.asc">اسم ↑</option><option value="qty.desc">أعلى كمية</option><option value="qty.asc">أقل كمية</option><option value="cost.desc">أعلى تكلفة</option><option value="cost.asc">أقل تكلفة</option><option value="total.desc">أعلى إجمالي</option><option value="total.asc">أقل إجمالي</option></select>
+      <button id="rep_pur_btn" class="btn-secondary">عرض التقرير</button>
+    </div>
+    <div class="small">عدد أصناف: <span id="rep_pur_count">0</span> — المجموع: <span id="rep_pur_sum">0.00</span></div>
+    <div class="table-scroll">
+      <table id="rep_pur_table">
+        <thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="page_add_sale" class="card page hidden">
+    <h2>6- مبيعات</h2>
+    <div class="row" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label>رقم الفاتورة</label><input id="sale_invoice_no" readonly />
+        <input id="sale_source" placeholder="العميل" />
+        <input id="sale_date" type="date" />
+        <input id="sale_note" placeholder="ملاحظة" />
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="sale_save_print" class="btn-primary">حفظ وطباعـة</button>
+        <button id="sale_save" class="btn-secondary">حفظ</button>
+        <button id="sale_clear" class="btn-secondary">تفريغ الحقول</button>
+      </div>
+    </div>
+
+    <div class="flex-split" style="margin-top:12px">
+      <div class="left card" style="padding:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <button id="open_sale_items" class="btn-secondary">عرض الأصناف</button>
+          <div class="small">اضغط صفًا في قائمة الأصناف ليُنزل تلقائيًا أو اختر من المنسدلة.</div>
+        </div>
+
+        <table>
+          <thead><tr><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><select id="sale_item_select"></select></td>
+              <td><input id="sale_item_unit" disabled /></td>
+              <td><input id="sale_item_price" type="number" step="0.01" /></td>
+              <td><input id="sale_item_qty" type="number" step="1" /></td>
+              <td><input id="sale_item_total" readonly class="summary-box" /></td>
+              <td><button id="sale_add_line" class="btn-primary">أضف للصنف</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="right card">
+        <h3>بنود الفاتورة</h3>
+        <div class="table-scroll">
+          <table id="sale_lines_table">
+            <thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <div class="small">عدد الأصناف: <span id="sale_lines_count">0</span></div>
+          <div class="small">المجموع: <span id="sale_total">0.00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="page_sale_list" class="card page hidden">
+    <h2>7- قائمة فواتير المبيعات</h2>
+    <div class="row">
+      من: <input id="sale_filter_from" type="date" /> إلى: <input id="sale_filter_to" type="date" />
+      <button id="sale_filter_btn" class="btn-secondary">فلتر</button>
+      <input id="sale_search" placeholder="بحث رقم/عميل" />
+    </div>
+    <div class="small">عدد الفواتير: <span id="sale_count">0</span> — المجموع: <span id="sale_sum">0.00</span></div>
+    <div class="table-scroll">
+      <table id="sales_table">
+        <thead><tr><th>رقم</th><th>تاريخ</th><th>العميل</th><th>إجمالي</th><th>الربح</th><th>عرض</th><th>طباعة</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="page_sale_report" class="card page hidden">
+    <h2>8- تقرير مبيعات (حسب الأصناف)</h2>
+    <div class="row">
+      من: <input id="rep_sale_from" type="date" /> إلى: <input id="rep_sale_to" type="date" />
+      <select id="rep_sale_sort"><option value="name.asc">اسم ↑</option><option value="qty.desc">أعلى كمية</option><option value="qty.asc">أقل كمية</option><option value="price.desc">أعلى سعر</option><option value="price.asc">أقل سعر</option><option value="total.desc">أعلى إجمالي</option><option value="total.asc">أقل إجمالي</option></select>
+      <button id="rep_sale_btn" class="btn-secondary">عرض التقرير</button>
+    </div>
+    <div class="small">عدد أصناف: <span id="rep_sale_count">0</span> — المجموع: <span id="rep_sale_sum">0.00</span> — تكلفة: <span id="rep_sale_cost_sum">0.00</span> — ربح: <span id="rep_sale_profit">0.00</span></div>
+    <div class="table-scroll">
+      <table id="rep_sale_table">
+        <thead><tr><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-- Modal: items -->
+<div id="item_modal" class="modal" onclick="if(event.target.id==='item_modal') closeModal()">
+  <div class="box" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>قائمة الأصناف</h3>
+      <div>
+        <input id="modal_search" placeholder="بحث..." />
+        <button id="modal_close" class="btn-secondary">إغلاق</button>
+      </div>
+    </div>
+    <div class="table-scroll" style="margin-top:8px">
+      <table id="modal_items_table">
+        <thead><tr><th>ID</th><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>السعر</th><th>المخزون</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="small" style="margin-top:8px">اضغط أي صف لاختيار الصنف ونزوله تلقائياً للفاتورة.</div>
+  </div>
+</div>
+
+<script>
+/* Clean, organized single-file POS logic
+   - sequential invoice numbers
+   - sidebar toggle (always visible FAB)
+   - sticky headers in tables
+   - modal with clickable rows (select item)
+   - input-row shows total before adding
+   - selling accepts quantity even if stock insufficient
+   - print sale: no cost/profit printed
+*/
+
+(function(){
+  /* ---------- storage helpers & initial data ---------- */
+  const uid = (p='id') => p + '_' + Math.random().toString(36).slice(2,9)
+  const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d } catch { return d } }
+  const save = (k, v) => localStorage.setItem(k, JSON.stringify(v))
+
+  let settings = load('pos_settings', { mode: 'batch' })
+  let items = load('pos_items', [])
+  let batches = load('pos_batches', [])
+  let purchases = load('pos_purchases', [])
+  let sales = load('pos_sales', [])
+  let nextSaleNo = load('pos_nextSaleNo', 1)
+  let nextPurNo = load('pos_nextPurNo', 1)
+
+  const persistAll = () => {
+    save('pos_settings', settings)
+    save('pos_items', items)
+    save('pos_batches', batches)
+    save('pos_purchases', purchases)
+    save('pos_sales', sales)
+    save('pos_nextSaleNo', nextSaleNo)
+    save('pos_nextPurNo', nextPurNo)
+  }
+
+  /* ---------- ui & utilities ---------- */
+  const toastEl = document.getElementById('toast')
+  const showToast = (msg, ms=3000) => {
+    toastEl.textContent = msg
+    toastEl.style.display = 'block'
+    clearTimeout(showToast._t)
+    showToast._t = setTimeout(()=> toastEl.style.display = 'none', ms)
+  }
+
+  const formatNumber = x => Number(x || 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+
+  function setInvoiceNumbers(){
+    document.getElementById('sale_invoice_no').value = `S-${String(nextSaleNo).padStart(5,'0')}`
+    document.getElementById('pur_invoice_no').value = `P-${String(nextPurNo).padStart(5,'0')}`
+  }
+
+  /* ---------- basic helpers ---------- */
+  const itemStockQty = id => batches.filter(b=>b.itemId===id).reduce((s,b)=> s + (b.remainingQty||0), 0)
+  const itemStockValue = id => batches.filter(b=>b.itemId===id).reduce((s,b)=> s + (b.remainingQty||0)*(b.cost||0), 0)
+  const findItem = id => items.find(i=>i.id===id) || { id, name: id, unit:'', manualCost:0, price:0 }
+
+  /* ---------- rendering functions ---------- */
+  function renderItems(){
+    const tbody = document.querySelector('#items_table tbody')
+    tbody.innerHTML = ''
+    const q = (document.getElementById('search_items').value || '').toLowerCase()
+    const sort = document.getElementById('sort_items').value || 'id.asc'
+    let list = items.filter(it => it.name.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
+    list.sort((a,b) => {
+      const [k,dir] = sort.split('.')
+      let va, vb
+      if(k==='id'){ va=a.id; vb=b.id }
+      else if(k==='qty'){ va=itemStockQty(a.id); vb=itemStockQty(b.id) }
+      else if(k==='cost'){ va=a.manualCost||0; vb=b.manualCost||0 }
+      else if(k==='price'){ va=a.price||0; vb=b.price||0 }
+      if(typeof va === 'string') return dir==='asc'? va.localeCompare(vb) : vb.localeCompare(va)
+      return dir==='asc'? (va-vb) : (vb-va)
+    })
+    for(const it of list){
+      const tr = document.createElement('tr')
+      tr.innerHTML = `
+        <td>—</td>
+        <td>${it.id}</td>
+        <td>${it.name}</td>
+        <td>${it.unit}</td>
+        <td>${formatNumber(it.manualCost)}${settings.mode==='average'? '<br><span class="small">avg:'+formatNumber(it.avgCost||0)+'</span>':''}</td>
+        <td>${formatNumber(it.price)}</td>
+        <td>${it.openingQty||0}</td>
+        <td>${purchases.reduce((s,p)=> s + p.lines.filter(l=>l.itemId===it.id).reduce((ss,l)=>ss+l.qty,0),0)}</td>
+        <td>${sales.reduce((s,p)=> s + p.lines.filter(l=>l.itemId===it.id).reduce((ss,l)=>ss+l.qty,0),0)}</td>
+        <td>${itemStockQty(it.id)}</td>
+        <td>${formatNumber(itemStockValue(it.id))}</td>
+        <td>
+          <button class="btn-secondary btn-edit" data-id="${it.id}">تعديل</button>
+          <button class="btn-secondary btn-batches" data-id="${it.id}">دفعات</button>
+        </td>`
+      tbody.appendChild(tr)
+    }
+    document.getElementById('items_count').textContent = `عرض ${list.length} من ${items.length} أصناف`
+  }
+
+  function renderModalItems(){
+    const tbody = document.querySelector('#modal_items_table tbody')
+    tbody.innerHTML = ''
+    const q = (document.getElementById('modal_search').value || '').toLowerCase()
+    let list = items.filter(it => it.name.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
+    for(const it of list){
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${it.id}</td><td>${it.name}</td><td>${it.unit}</td><td>${formatNumber(it.manualCost)}</td><td>${formatNumber(it.price)}</td><td>${itemStockQty(it.id)}</td>`
+      tr.addEventListener('click', ()=> selectItemFromModal(it.id))
+      tbody.appendChild(tr)
+    }
+  }
+
+  function populateSelects(){
+    const sels = ['pur_item_select','sale_item_select']
+    for(const id of sels){
+      const sel = document.getElementById(id)
+      sel.innerHTML = ''
+      for(const it of items){
+        const opt = document.createElement('option'); opt.value = it.id; opt.textContent = `${it.name} [${it.id}]`; sel.appendChild(opt)
+      }
+      sel.dispatchEvent(new Event('change'))
+    }
+  }
+
+  /* ---------- purchases UI ---------- */
+  let purLines = []
+
+  function updatePurInputTotal(){
+    const cost = parseFloat(document.getElementById('pur_item_cost').value) || 0
+    const qty = parseInt(document.getElementById('pur_item_qty').value) || 0
+    document.getElementById('pur_item_total').value = formatNumber(cost * qty)
+  }
+
+  function addPurLineFromInput(){
+    const itemId = document.getElementById('pur_item_select').value
+    const it = findItem(itemId)
+    const unit = it.unit
+    const cost = parseFloat(document.getElementById('pur_item_cost').value) || it.manualCost || 0
+    const qty = parseInt(document.getElementById('pur_item_qty').value) || 0
+    if(qty <= 0) { alert('ادخل كمية أكبر من صفر'); return }
+    purLines.push({ id: uid('pline'), itemId, unit, cost, qty, total: cost*qty })
+    renderPurLines()
+    updatePurInputTotal()
+  }
+
+  function renderPurLines(){
+    const tbody = document.querySelector('#pur_lines_table tbody'); tbody.innerHTML = ''
+    for(let i=0;i<purLines.length;i++){
+      const l = purLines[i]
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${i+1}</td><td>${findItem(l.itemId).name}</td><td>${l.unit}</td><td>${formatNumber(l.cost)}</td><td>${l.qty}</td><td>${formatNumber(l.total)}</td><td><button class="btn-secondary btn-rem-pur" data-id="${l.id}">حذف</button></td>`
+      tbody.appendChild(tr)
+    }
+    document.getElementById('pur_lines_count').textContent = purLines.length
+    document.getElementById('pur_total').textContent = formatNumber(purLines.reduce((s,l)=>s+l.total,0))
+  }
+
+  function removePurLine(id){
+    purLines = purLines.filter(l=> l.id !== id)
+    renderPurLines()
+  }
+
+  function savePurchase(printAfter=false){
+    if(purLines.length===0){ alert('لا توجد بنود للحفظ'); return }
+    const invoiceNo = `P-${String(nextPurNo).padStart(5,'0')}`
+    const source = (document.getElementById('pur_source').value || '').trim()
+    const date = document.getElementById('pur_date').value || new Date().toISOString().slice(0,10)
+    const note = (document.getElementById('pur_note').value || '').trim()
+    const pur = { id: uid('pur'), invoiceNo, source, date, note, lines: JSON.parse(JSON.stringify(purLines)), total: purLines.reduce((s,l)=>s+l.total,0) }
+
+    for(const l of pur.lines){
+      const item = findItem(l.itemId)
+      if(settings.mode === 'batch'){
+        batches.push({ id: uid('batch'), itemId: l.itemId, qty: l.qty, remainingQty: l.qty, cost: l.cost, type:'purchase', date: new Date().toISOString(), note:`pur:${invoiceNo}` })
+      } else {
+        const curQty = itemStockQty(l.itemId)
+        const curVal = itemStockValue(l.itemId)
+        const newQty = curQty + l.qty
+        const newVal = curVal + l.total
+        item.avgCost = newQty>0 ? (newVal / newQty) : l.cost
+        batches.push({ id: uid('batch'), itemId: l.itemId, qty: l.qty, remainingQty: l.qty, cost: item.avgCost, type:'purchase', date: new Date().toISOString(), note:`pur:${invoiceNo}` })
+      }
+    }
+
+    purchases.push(pur)
+    nextPurNo += 1
+    persistAll()
+
+    // clear
+    purLines = []
+    renderPurLines()
+    document.getElementById('pur_source').value = ''
+    document.getElementById('pur_date').value = ''
+    document.getElementById('pur_note').value = ''
+    document.getElementById('pur_item_cost').value = ''
+    document.getElementById('pur_item_qty').value = ''
+    document.getElementById('pur_item_total').value = ''
+    setInvoiceNumbers()
+    renderPurchases()
+    renderItems()
+    populateSelects()
+    renderModalItems()
+    showToast('تم حفظ الفاتورة',3000)
+    if(printAfter) setTimeout(()=> printPurchase(pur.id), 200)
+  }
+
+  function renderPurchases(){
+    const tbody = document.querySelector('#purchases_table tbody'); tbody.innerHTML = ''
+    const q = (document.getElementById('pur_search').value || '').toLowerCase()
+    const from = document.getElementById('pur_filter_from').value
+    const to = document.getElementById('pur_filter_to').value
+    const list = purchases.filter(p => {
+      if(q && !(p.invoiceNo.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q))) return false
+      if(from && p.date < from) return false
+      if(to && p.date > to) return false
+      return true
+    })
+    let sum = 0
+    for(const p of list){
+      sum += p.total
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${p.invoiceNo}</td><td>${p.date}</td><td>${p.source}</td><td>${formatNumber(p.total)}</td><td><button class="btn-secondary btn-view-pur" data-id="${p.id}">عرض</button></td><td><button class="btn-secondary btn-print-pur" data-id="${p.id}">طباعة</button></td>`
+      tbody.appendChild(tr)
+    }
+    document.getElementById('pur_count').textContent = list.length
+    document.getElementById('pur_sum').textContent = formatNumber(sum)
+  }
+
+  function printPurchase(purId){
+    const p = purchases.find(x=>x.id===purId); if(!p) return
+    const w = window.open('','_blank','width=700,height=900')
+    let html = `<html><head><meta charset="utf-8"><title>فاتورة مشتريات ${p.invoiceNo}</title><style>body{font-family:Arial,Helvetica,sans-serif;direction:rtl}table{width:100%;border-collapse:collapse}th,td{padding:6px;border:1px solid #ccc;text-align:center}</style></head><body>`
+    html += `<h2>فاتورة مشتريات #${p.invoiceNo}</h2><div>التاريخ: ${p.date} — المورد: ${p.source}</div><table><thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>`
+    for(const l of p.lines){
+      const it = findItem(l.itemId)
+      html += `<tr><td>${it.name}</td><td>${l.unit}</td><td>${formatNumber(l.cost)}</td><td>${l.qty}</td><td>${formatNumber(l.total)}</td></tr>`
+    }
+    html += `</tbody></table><h3>الإجمالي: ${formatNumber(p.total)}</h3></body></html>`
+    w.document.write(html); w.document.close(); w.focus(); setTimeout(()=> w.print(), 300)
+  }
+
+  /* ---------- sales UI ---------- */
+  let saleLines = []
+
+  function updateSaleInputTotal(){
+    const price = parseFloat(document.getElementById('sale_item_price').value) || 0
+    const qty = parseInt(document.getElementById('sale_item_qty').value) || 0
+    document.getElementById('sale_item_total').value = formatNumber(price * qty)
+  }
+
+  function addSaleLineFromInput(){
+    const itemId = document.getElementById('sale_item_select').value
+    const it = findItem(itemId)
+    const price = parseFloat(document.getElementById('sale_item_price').value) || it.price || 0
+    const qty = parseInt(document.getElementById('sale_item_qty').value) || 0
+    if(qty <= 0){ alert('ادخل كمية أكبر من صفر'); return }
+    saleLines.push({ id: uid('sline'), itemId, unit: it.unit, price, qty, total: price*qty })
+    renderSaleLines()
+    updateSaleInputTotal()
+  }
+
+  function renderSaleLines(){
+    const tbody = document.querySelector('#sale_lines_table tbody'); tbody.innerHTML = ''
+    for(let i=0;i<saleLines.length;i++){
+      const l = saleLines[i]
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${i+1}</td><td>${findItem(l.itemId).name}</td><td>${l.unit}</td><td>${formatNumber(l.price)}</td><td>${l.qty}</td><td>${formatNumber(l.total)}</td><td><button class="btn-secondary btn-rem-sale" data-id="${l.id}">حذف</button></td>`
+      tbody.appendChild(tr)
+    }
+    document.getElementById('sale_lines_count').textContent = saleLines.length
+    document.getElementById('sale_total').textContent = formatNumber(saleLines.reduce((s,l)=>s+l.total,0))
+  }
+
+  function removeSaleLine(id){
+    saleLines = saleLines.filter(l=> l.id !== id)
+    renderSaleLines()
+  }
+
+  function saveSale(printAfter=false){
+    if(saleLines.length===0){ alert('لا توجد بنود للحفظ'); return }
+    const invoiceNo = `S-${String(nextSaleNo).padStart(5,'0')}`
+    const source = (document.getElementById('sale_source').value || '').trim()
+    const date = document.getElementById('sale_date').value || new Date().toISOString().slice(0,10)
+    const note = (document.getElementById('sale_note').value || '').trim()
+    const sale = { id: uid('sale'), invoiceNo, source, date, note, lines: [], total: 0, costTotal: 0 }
+
+    for(const l of saleLines){
+      // compute cost according to mode and consume batches FIFO, allow negative stock by creating negative batch
+      let remaining = l.qty
+      let costForLine = 0
+      if(settings.mode === 'batch'){
+        const itemBatches = batches.filter(b=>b.itemId===l.itemId && b.remainingQty>0).sort((a,b)=> new Date(a.date) - new Date(b.date))
+        for(const b of itemBatches){
+          if(remaining <= 0) break
+          const take = Math.min(b.remainingQty, remaining)
+          b.remainingQty -= take
+          remaining -= take
+          costForLine += take * b.cost
+        }
+        if(remaining > 0){
+          const it = findItem(l.itemId)
+          const fallback = it.avgCost || it.manualCost || 0
+          batches.push({ id: uid('batch'), itemId: l.itemId, qty: -remaining, remainingQty: -remaining, cost: fallback, type:'negative', date: new Date().toISOString(), note: `short:${invoiceNo}` })
+          costForLine += remaining * fallback
+          remaining = 0
+        }
+      } else { // average
+        const it = findItem(l.itemId)
+        const avg = it.avgCost || it.manualCost || 0
+        costForLine = l.qty * avg
+        // still decrement batches for bookkeeping
+        let rem = l.qty
+        const itemBatches = batches.filter(b=>b.itemId===l.itemId && b.remainingQty>0).sort((a,b)=> new Date(a.date) - new Date(b.date))
+        for(const b of itemBatches){
+          if(rem <= 0) break
+          const take = Math.min(b.remainingQty, rem)
+          b.remainingQty -= take
+          rem -= take
+        }
+        if(rem > 0){
+          batches.push({ id: uid('batch'), itemId: l.itemId, qty: -rem, remainingQty: -rem, cost: avg, type:'negative', date: new Date().toISOString(), note:`short:${invoiceNo}` })
+        }
+      }
+      sale.lines.push({ ...l, costForThisLine: costForLine })
+      sale.total += l.total
+      sale.costTotal += costForLine
+    }
+
+    sales.push(sale)
+    nextSaleNo += 1
+    persistAll()
+
+    // clear
+    saleLines = []
+    renderSaleLines()
+    document.getElementById('sale_source').value = ''
+    document.getElementById('sale_date').value = ''
+    document.getElementById('sale_note').value = ''
+    document.getElementById('sale_item_price').value = ''
+    document.getElementById('sale_item_qty').value = ''
+    document.getElementById('sale_item_total').value = ''
+    setInvoiceNumbers()
+    renderSales()
+    renderItems()
+    populateSelects()
+    renderModalItems()
+    showToast('تم حفظ الفاتورة', 3000)
+    if(printAfter) setTimeout(()=> printSale(sale.id), 200)
+  }
+
+  function renderSales(){
+    const tbody = document.querySelector('#sales_table tbody'); tbody.innerHTML = ''
+    const q = (document.getElementById('sale_search').value || '').toLowerCase()
+    const from = document.getElementById('sale_filter_from').value
+    const to = document.getElementById('sale_filter_to').value
+    const list = sales.filter(p => {
+      if(q && !(p.invoiceNo.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q))) return false
+      if(from && p.date < from) return false
+      if(to && p.date > to) return false
+      return true
+    })
+    let sum = 0
+    for(const p of list){
+      sum += p.total
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${p.invoiceNo}</td><td>${p.date}</td><td>${p.source}</td><td>${formatNumber(p.total)}</td><td>${formatNumber(p.total - p.costTotal)}</td><td><button class="btn-secondary btn-view-sale" data-id="${p.id}">عرض</button></td><td><button class="btn-secondary btn-print-sale" data-id="${p.id}">طباعة</button></td>`
+      tbody.appendChild(tr)
+    }
+    document.getElementById('sale_count').textContent = list.length
+    document.getElementById('sale_sum').textContent = formatNumber(sum)
+  }
+
+  function printSale(saleId){
+    const s = sales.find(x=>x.id===saleId); if(!s) return
+    const w = window.open('','_blank','width=700,height=900')
+    let html = `<html><head><meta charset="utf-8"><title>فاتورة مبيعات ${s.invoiceNo}</title><style>body{font-family:Arial,Helvetica,sans-serif;direction:rtl}table{width:100%;border-collapse:collapse}th,td{padding:6px;border:1px solid #ccc;text-align:center}</style></head><body>`
+    html += `<h2>فاتورة مبيعات #${s.invoiceNo}</h2><div>التاريخ: ${s.date} — العميل: ${s.source}</div><table><thead><tr><th>الصنف</th><th>الوحدة</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>`
+    for(const l of s.lines){
+      const it = findItem(l.itemId)
+      html += `<tr><td>${it.name}</td><td>${l.unit}</td><td>${formatNumber(l.price)}</td><td>${l.qty}</td><td>${formatNumber(l.total)}</td></tr>`
+    }
+    html += `</tbody></table><h3>الإجمالي: ${formatNumber(s.total)}</h3></body></html>`
+    w.document.write(html); w.document.close(); w.focus(); setTimeout(()=> w.print(), 300)
+  }
+
+  /* ---------- modal controls ---------- */
+  function openModal(mode){
+    document.getElementById('item_modal').style.display = 'flex'
+    document.getElementById('modal_search').value = ''
+    renderModalItems()
+    // store mode in dataset to know where to send selected item
+    document.getElementById('item_modal').dataset.mode = mode
+  }
+  function closeModal(){ document.getElementById('item_modal').style.display = 'none' }
+
+  function selectItemFromModal(itemId){
+    const mode = document.getElementById('item_modal').dataset.mode
+    const it = findItem(itemId)
+    if(mode === 'pur'){
+      document.getElementById('pur_item_select').value = it.id
+      document.getElementById('pur_item_unit').value = it.unit
+      document.getElementById('pur_item_cost').value = it.manualCost || ''
+      document.getElementById('pur_item_qty').value = 1
+      updatePurInputTotal()
+    } else {
+      document.getElementById('sale_item_select').value = it.id
+      document.getElementById('sale_item_unit').value = it.unit
+      document.getElementById('sale_item_price').value = it.price || ''
+      document.getElementById('sale_item_qty').value = 1
+      updateSaleInputTotal()
+    }
+    closeModal()
+  }
+
+  /* ---------- binding & events ---------- */
+  function bind(){
+    // sidebar toggle
+    document.getElementById('sidebar_toggle_fab').addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('collapsed'))
+    document.getElementById('sidebar_close').addEventListener('click', ()=> document.getElementById('sidebar').classList.add('collapsed'))
+    document.querySelectorAll('.sidebtn[data-target]').forEach(btn => btn.addEventListener('click', ()=> {
+      const t = btn.dataset.target
+      document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'))
+      document.getElementById(t).classList.remove('hidden')
+      window.scrollTo({top:0,behavior:'smooth'})
+      document.getElementById('sidebar').classList.add('collapsed')
+    }))
+
+    // mode select
+    document.getElementById('mode').value = settings.mode
+    document.getElementById('mode').addEventListener('change', e => { settings.mode = e.target.value; save('pos_settings', settings); document.getElementById('side_mode').textContent = settings.mode })
+
+    // items
+    document.getElementById('addItemBtn').addEventListener('click', ()=>{
+      const name = (document.getElementById('item_name').value || '').trim()
+      if(!name){ alert('ادخل اسم الصنف'); return }
+      const unit = (document.getElementById('item_unit').value || '').trim() || 'pcs'
+      const cost = parseFloat(document.getElementById('item_cost').value) || 0
+      const price = parseFloat(document.getElementById('item_price').value) || 0
+      const openQty = parseInt(document.getElementById('item_open_qty').value) || 0
+      const id = uid('item')
+      items.push({ id, name, unit, manualCost: cost, price, openingQty: openQty, openingValue: openQty*cost, avgCost: cost })
+      if(openQty>0) batches.push({ id: uid('batch'), itemId: id, qty: openQty, remainingQty: openQty, cost, type: 'opening', date: new Date().toISOString(), note: 'opening' })
+      persistAll()
+      document.getElementById('item_name').value = ''
+      document.getElementById('item_unit').value = ''
+      document.getElementById('item_cost').value = ''
+      document.getElementById('item_price').value = ''
+      document.getElementById('item_open_qty').value = ''
+      populateSelects()
+      renderItems()
+      renderModalItems()
+      showToast('تم حفظ الصنف', 3000)
+    })
+
+    document.getElementById('search_items').addEventListener('input', renderItems)
+    document.getElementById('sort_items').addEventListener('change', renderItems)
+
+    // modal
+    document.getElementById('open_pur_items').addEventListener('click', ()=> { openModal('pur') })
+    document.getElementById('open_sale_items').addEventListener('click', ()=> { openModal('sale') })
+    document.getElementById('modal_close').addEventListener('click', closeModal)
+    document.getElementById('modal_search').addEventListener('input', renderModalItems)
+
+    // pur input behavior
+    document.getElementById('pur_item_select').addEventListener('change', function(){
+      const it = findItem(this.value)
+      document.getElementById('pur_item_unit').value = it.unit
+      if(!document.getElementById('pur_item_cost').value) document.getElementById('pur_item_cost').value = it.manualCost || ''
+      updatePurInputTotal()
+    })
+    document.getElementById('pur_item_cost').addEventListener('input', updatePurInputTotal)
+    document.getElementById('pur_item_qty').addEventListener('input', updatePurInputTotal)
+    document.getElementById('pur_add_line').addEventListener('click', addPurLineFromInput)
+
+    // pur lines remove using event delegation
+    document.getElementById('pur_lines_table').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.btn-rem-pur')
+      if(btn) removePurLine(btn.dataset.id)
+    })
+
+    // save/print purchase
+    document.getElementById('pur_save').addEventListener('click', ()=> savePurchase(false))
+    document.getElementById('pur_save_print').addEventListener('click', ()=> savePurchase(true))
+    document.getElementById('pur_clear').addEventListener('click', ()=>{
+      document.getElementById('pur_source').value = ''
+      document.getElementById('pur_date').value = ''
+      document.getElementById('pur_note').value = ''
+      document.getElementById('pur_item_cost').value = ''
+      document.getElementById('pur_item_qty').value = ''
+      document.getElementById('pur_item_total').value = ''
+      purLines = []; renderPurLines()
+    })
+
+    document.getElementById('pur_search').addEventListener('input', renderPurchases)
+    document.getElementById('pur_filter_btn').addEventListener('click', renderPurchases)
+    // purchases table actions
+    document.getElementById('purchases_table').addEventListener('click', (e)=>{
+      const view = e.target.closest('.btn-view-pur')
+      if(view) {
+        const p = purchases.find(x=>x.id===view.dataset.id)
+        if(p){ alert(`فاتورة ${p.invoiceNo}\nتاريخ: ${p.date}\nالمجموع: ${formatNumber(p.total)}\nبنود:\n` + p.lines.map(l=> `${findItem(l.itemId).name} | ${l.qty} | ${formatNumber(l.total)}`).join('\n')) }
+      }
+      const pr = e.target.closest('.btn-print-pur')
+      if(pr) printPurchase(pr.dataset.id)
+    })
+
+    // sale input behavior
+    document.getElementById('sale_item_select').addEventListener('change', function(){
+      const it = findItem(this.value)
+      document.getElementById('sale_item_unit').value = it.unit
+      if(!document.getElementById('sale_item_price').value) document.getElementById('sale_item_price').value = it.price || ''
+      updateSaleInputTotal()
+    })
+    document.getElementById('sale_item_price').addEventListener('input', updateSaleInputTotal)
+    document.getElementById('sale_item_qty').addEventListener('input', updateSaleInputTotal)
+    document.getElementById('sale_add_line').addEventListener('click', addSaleLineFromInput)
+
+    // sale lines remove
+    document.getElementById('sale_lines_table').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.btn-rem-sale')
+      if(btn) removeSaleLine(btn.dataset.id)
+    })
+
+    // save/print sale
+    document.getElementById('sale_save').addEventListener('click', ()=> saveSale(false))
+    document.getElementById('sale_save_print').addEventListener('click', ()=> saveSale(true))
+    document.getElementById('sale_clear').addEventListener('click', ()=> {
+      document.getElementById('sale_source').value = ''
+      document.getElementById('sale_date').value = ''
+      document.getElementById('sale_note').value = ''
+      document.getElementById('sale_item_price').value = ''
+      document.getElementById('sale_item_qty').value = ''
+      document.getElementById('sale_item_total').value = ''
+      saleLines = []; renderSaleLines()
+    })
+
+    document.getElementById('sale_search').addEventListener('input', renderSales)
+    document.getElementById('sale_filter_btn').addEventListener('click', renderSales)
+    document.getElementById('sales_table').addEventListener('click', (e)=>{
+      const view = e.target.closest('.btn-view-sale'); if(view){ const s = sales.find(x=>x.id===view.dataset.id); if(s){ alert(`فاتورة ${s.invoiceNo}\nتاريخ: ${s.date}\nإجمالي: ${formatNumber(s.total)}\nبنود:\n` + s.lines.map(l=> `${findItem(l.itemId).name} | ${l.qty} | ${formatNumber(l.total)}`).join('\n')) } }
+      const pr = e.target.closest('.btn-print-sale'); if(pr) printSale(pr.dataset.id)
+    })
+
+    // reports
+    document.getElementById('rep_pur_btn').addEventListener('click', renderPurchaseReport)
+    document.getElementById('rep_sale_btn').addEventListener('click', renderSalesReport)
+
+    // export/import/clear
+    document.getElementById('exportBtn').addEventListener('click', ()=> {
+      const data = { settings, items, batches, purchases, sales, nextSaleNo, nextPurNo }
+      const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = 'pos_export.json'; a.click(); URL.revokeObjectURL(url)
+    })
+    document.getElementById('importBtn').addEventListener('click', ()=>{
+      const txt = prompt('الصق JSON هنا للاستيراد')
+      if(!txt) return
+      try{
+        const obj = JSON.parse(txt)
+        if(confirm('استيراد سيستبدل البيانات الحالية. متأكد؟')){
+          settings = obj.settings || settings
+          items = obj.items || []
+          batches = obj.batches || []
+          purchases = obj.purchases || []
+          sales = obj.sales || []
+          nextSaleNo = obj.nextSaleNo || nextSaleNo
+          nextPurNo = obj.nextPurNo || nextPurNo
+          persistAll()
+          refreshAll()
+          showToast('تم الاستيراد',3000)
+        }
+      }catch(e){ alert('JSON غير صالح: ' + e.message) }
+    })
+    document.getElementById('clearBtn').addEventListener('click', ()=> {
+      if(confirm('سيتم مسح كل البيانات. التأكيد؟')){
+        localStorage.clear()
+        settings = { mode: 'batch' }; items = []; batches = []; purchases = []; sales = []; nextSaleNo = 1; nextPurNo = 1
+        persistAll(); refreshAll(); showToast('تم مسح البيانات', 3000)
+      }
+    })
+  } // bind()
+
+  /* ---------- simple reports ---------- */
+  function renderPurchaseReport(){
+    const from = document.getElementById('rep_pur_from').value
+    const to = document.getElementById('rep_pur_to').value
+    const sort = document.getElementById('rep_pur_sort').value
+    const map = {}
+    for(const p of purchases){
+      if(from && p.date < from) continue
+      if(to && p.date > to) continue
+      for(const l of p.lines){
+        if(!map[l.itemId]) map[l.itemId] = { qty:0, total:0, cost: l.cost, item: findItem(l.itemId) }
+        map[l.itemId].qty += l.qty
+        map[l.itemId].total += l.total
+      }
+    }
+    let arr = Object.values(map)
+    arr.sort((a,b)=>{
+      const [k,d] = sort.split('.')
+      if(k==='name') return a.item.name.localeCompare(b.item.name)
+      if(k==='qty') return d==='desc'? b.qty - a.qty : a.qty - b.qty
+      if(k==='cost') return d==='desc'? b.cost - a.cost : a.cost - b.cost
+      if(k==='total') return d==='desc'? b.total - a.total : a.total - b.total
+      return 0
+    })
+    const tbody = document.querySelector('#rep_pur_table tbody'); tbody.innerHTML = ''
+    let sum = 0
+    for(const r of arr){
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${r.item.name}</td><td>${r.item.unit}</td><td>${formatNumber(r.cost)}</td><td>${r.qty}</td><td>${formatNumber(r.total)}</td>`
+      tbody.appendChild(tr)
+      sum += r.total
+    }
+    document.getElementById('rep_pur_count').textContent = arr.length
+    document.getElementById('rep_pur_sum').textContent = formatNumber(sum)
+  }
+
+  function renderSalesReport(){
+    const from = document.getElementById('rep_sale_from').value
+    const to = document.getElementById('rep_sale_to').value
+    const sort = document.getElementById('rep_sale_sort').value
+    const map = {}
+    for(const s of sales){
+      if(from && s.date < from) continue
+      if(to && s.date > to) continue
+      for(const l of s.lines){
+        if(!map[l.itemId]) map[l.itemId] = { qty:0, total:0, price: l.price, item: findItem(l.itemId) }
+        map[l.itemId].qty += l.qty
+        map[l.itemId].total += l.total
+      }
+    }
+    let arr = Object.values(map)
+    arr.sort((a,b)=>{
+      const [k,d] = sort.split('.')
+      if(k==='name') return a.item.name.localeCompare(b.item.name)
+      if(k==='qty') return d==='desc'? b.qty - a.qty : a.qty - b.qty
+      if(k==='price') return d==='desc'? b.price - a.price : a.price - b.price
+      if(k==='total') return d==='desc'? b.total - a.total : a.total - b.total
+      return 0
+    })
+    const tbody = document.querySelector('#rep_sale_table tbody'); tbody.innerHTML = ''
+    let sum = 0, costSum = 0
+    for(const r of arr){
+      const tr = document.createElement('tr')
+      tr.innerHTML = `<td>${r.item.name}</td><td>${r.item.unit}</td><td>${formatNumber(r.price)}</td><td>${r.qty}</td><td>${formatNumber(r.total)}</td>`
+      tbody.appendChild(tr)
+      sum += r.total
+    }
+    for(const s of sales){
+      if(from && s.date < from) continue
+      if(to && s.date > to) continue
+      costSum += s.costTotal || 0
+    }
+    document.getElementById('rep_sale_count').textContent = arr.length
+    document.getElementById('rep_sale_sum').textContent = formatNumber(sum)
+    document.getElementById('rep_sale_cost_sum').textContent = formatNumber(costSum)
+    document.getElementById('rep_sale_profit').textContent = formatNumber(sum - costSum)
+  }
+
+  /* ---------- initial rendering & utility ---------- */
+  function refreshAll(){
+    populateSelects()
+    renderItems()
+    renderModalItems()
+    renderPurLines()
+    renderPurchases()
+    renderPurchaseReport()
+    renderSaleLines()
+    renderSales()
+    renderSalesReport()
+    setInvoiceNumbers()
+    document.getElementById('side_mode').textContent = settings.mode
+  }
+
+  // attach delegated handlers for elements created dynamically
+  document.addEventListener('click', function(e){
+    // edit buttons in items table
+    if(e.target.matches('.btn-edit')){
+      const id = e.target.dataset.id
+      const item = items.find(it=>it.id===id)
+      if(!item) return
+      const newName = prompt('اسم الصنف', item.name); if(newName===null) return
+      const newUnit = prompt('الوحدة', item.unit); if(newUnit===null) return
+      const newCost = parseFloat(prompt('التكلفة الافتراضية', item.manualCost || 0))
+      const newPrice = parseFloat(prompt('السعر', item.price || 0))
+      item.name = newName || item.name
+item.unit = newUnit || item.unit
+      item.manualCost = isNaN(newCost)? item.manualCost : newCost
+      item.price = isNaN(newPrice)? item.price : newPrice
+            persistAll(); refreshAll()
+      return
+    }
+
+    // batches button
+    if(e.target.matches('.btn-batches')){
+      const id = e.target.dataset.id
+      const list = batches.filter(b=>b.itemId===id)
+      if(list.length===0){ alert('لا دفعات لهذا الصنف'); return }
+      alert(list.map(b=> `${b.id} | نوع:${b.type} | تاريخ:${new Date(b.date).toLocaleDateString()} | qty:${b.qty} | متبقي:${b.remainingQty} | cost:${formatNumber(b.cost)}`).join('\n'))
+      return
+    }
+
+    // purchases table actions handled earlier by delegation on table
+  })
+
+  // wire up delegated deletion for pur/sale lines (since buttons created later)
+  document.addEventListener('click', function(e){
+    // remove pur line
+    if(e.target.matches('.btn-rem-pur')){
+      removePurLine(e.target.dataset.id)
+    }
+    // remove sale line
+    if(e.target.matches('.btn-rem-sale')){
+      removeSaleLine(e.target.dataset.id)
+    }
+    // view/print handled earlier with specific listeners
+  })
+
+  // initialize
+  bind()
+  refreshAll()
+  persistAll()
+})();
+</script>
+</body>
+</html>
