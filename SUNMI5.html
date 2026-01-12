@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>نظام مطاعم - POS (Sunmi)</title>
+<style>
+:root{
+  --bg:#f4f7f9; --card:#fff; --muted:#6b7280; --accent:#0b6b63; --accent-2:#06a89a;
+  --head:#07353a; --head-bg:linear-gradient(180deg,#dff3f2,#e6fbf9); --row-even:#f0fbfa; --hover:rgba(6,168,154,0.08);
+  --danger:#b00020; --shadow:0 2px 6px rgba(10,20,25,0.06);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:"Noto Naskh Arabic",Tahoma,Arial;direction:rtl;background:var(--bg);color:#111}
+#sidebar_toggle_fab{position:fixed;left:12px;top:12px;z-index:1200;background:var(--accent);color:#fff;border:none;padding:12px 14px;border-radius:10px;box-shadow:var(--shadow);font-size:16px}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:linear-gradient(180deg,#063a3a,#095959);color:#fff;padding:14px;display:flex;flex-direction:column;gap:10px;z-index:1100;transition:transform .18s}
+.sidebar.collapsed{transform:translateX(-100%)}
+.sidebtn{background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.08);padding:12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:15px}
+.content{margin-right:260px;padding:16px}
+.card{background:var(--card);padding:14px;border-radius:10px;box-shadow:var(--shadow);margin-bottom:14px}
+.row{display:flex;gap:10px;align-items:center}
+input,select,button,textarea{padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:15px}
+button{cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:8px;background:var(--card)}
+th,td{padding:10px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:center}
+th{background:var(--head-bg);color:var(--head);position:sticky;top:0;z-index:6}
+tbody tr:nth-child(odd){background:#fff}
+tbody tr:nth-child(even){background:var(--row-even)}
+tbody tr:hover{background:var(--hover);cursor:pointer}
+.small{font-size:13px;color:var(--muted)}
+.btn-primary{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:8px;font-size:15px}
+.btn-secondary{background:#f3f4f6;border:none;padding:10px 14px;border-radius:8px}
+.btn-danger{background:var(--danger);color:#fff;border:none;padding:10px 14px;border-radius:8px}
+.table-scroll{max-height:420px;overflow:auto;border-radius:8px}
+.flex-split{display:flex;gap:12px}
+.flex-split .left{flex:0 0 52%}
+.flex-split .right{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:18px;background:#111;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:1300}
+.summary-box{background:linear-gradient(90deg,#e6fbf2,#f1fff8);padding:8px;border-radius:6px;text-align:center;border:1px solid rgba(6,168,154,0.12)}
+@media(max-width:900px){.sidebar{display:none}.content{margin:0}.flex-split{flex-direction:column}#sidebar_toggle_fab{left:8px}}
+</style>
+</head>
+<body>
+<button id="sidebar_toggle_fab" title="قوائم">☰ قوائم</button>
+
+<div id="sidebar" class="sidebar" aria-label="الشريط الجانبي">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div><h3 style="margin:0">قوائم النظام</h3><div class="small">اختر صفحة</div></div>
+    <button id="sidebar_close" class="sidebtn" title="إغلاق">✕</button>
+  </div>
+
+  <button class="sidebtn" data-target="page_add_item"><span>1</span><strong>إضافة صنف</strong></button>
+  <button class="sidebtn" data-target="page_items_list"><span>2</span><strong>قائمة الأصناف</strong></button>
+  <button class="sidebtn" data-target="page_add_purchase"><span>3</span><strong>إضافة فاتورة مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_pur_list"><span>4</span><strong>قائمة مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_pur_report"><span>5</span><strong>تقرير مشتريات</strong></button>
+  <button class="sidebtn" data-target="page_add_sale"><span>6</span><strong>إضافة فاتورة مبيعات</strong></button>
+  <button class="sidebtn" data-target="page_sale_list"><span>7</span><strong>قائمة مبيعات</strong></button>
+  <button class="sidebtn" data-target="page_sale_report"><span>8</span><strong>تقرير مبيعات</strong></button>
+
+  <div style="margin-top:auto"><div class="small">الوضع الحالي:</div><div id="side_mode" class="small" style="margin-top:8px;color:#fff;background:rgba(255,255,255,0.08);padding:6px 8px;border-radius:6px"></div></div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div class="content">
+  <h1>نظام مطاعم - POS (Sunmi)</h1>
+
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;gap:10px;align-items:center">
+      <label>وضع التكلفة</label>
+      <select id="mode"><option value="batch">دفعات (Batch)</option><option value="average">المتوسط المرجّح</option></select>
+      <span class="small">اختر أسلوب التكلفة</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="exportBtn" class="btn-secondary">تصدير</button>
+      <button id="importBtn" class="btn-secondary">استيراد</button>
+      <button id="clearBtn" class="btn-danger">مسح البيانات</button>
+    </div>
+  </div>
+
+  <!-- صفحات (كما في الملف السابق) -->
+  <!-- صفحة إضافة صنف -->
+  <section id="page_add_item" class="card page">
+    <h2>1- إضافة صنف</h2>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <input id="item_name" placeholder="اسم الصنف" style="min-width:180px"/>
+      <input id="item_unit" placeholder="الوحدة" style="width:120px"/>
+      <input id="item_cost" placeholder="التكلفة" type="number" step="0.01" style="width:120px"/>
+      <input id="item_price" placeholder="السعر" type="number" step="0.01" style="width:120px"/>
+      <input id="item_open_qty" placeholder="كمية افتتاحية" type="number" step="1" style="width:140px"/>
+      <button id="addItemBtn" class="btn-primary">حفظ الصنف</button>
+    </div>
+  </section>
+
+  <!-- صفحة قائمة الأصناف -->
+  <section id="page_items_list" class="card page hidden">
+    <h2>2- قائمة الأصناف</h2>
+    <div class="row" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="search_items" placeholder="بحث اسم أو كود" />
+        <select id="sort_items"><option value="id.asc">رقم ↑</option><option value="id.desc">رقم ↓</option><option value="qty.desc">أعلى مخزون</option><option value="qty.asc">أقل مخزون</option><option value="cost.desc">أعلى تكلفة</option><option value="cost.asc">أقل تكلفة</option><option value="price.desc">أعلى سعر</option><option value="price.asc">أقل سعر</option></select>
+      </div>
+      <div class="small" id="items_count"></div>
+    </div>
+
+    <div class="table-scroll">
+      <table id="items_table"><thead><tr><th>قبل</th><th>ID</th><th>الاسم</th><th>الوحدة</th><th>التكلفة</th><th>السعر</th><th>فتح</th><th>مشتريات</th><th>مبيعات</th><th>المخزون</th><th>إجمالي القيمة</th><th>إجراءات</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- صفحة إضافة مشتريات (مقسمة) -->
+  <section id="page_add_purchase" class="card page hidden">
+    <h2>3- إضافة فاتورة مشتريات</h2>
+    <div class="row" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label>رقم الفاتورة</label><input id="pur_invoice_no" readonly style="width:140px"/>
+        <input id="pur_source" placeholder="المورد" />
+        <input id="pur_date" type="date" />
+        <input id="pur_note" placeholder="ملاحظة" />
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="pur_save_print" class="btn-primary">حفظ & طباعة</button>
+        <button id="pur_save" class="btn-secondary">حفظ</button>
+        <button id="pur_clear" class="btn-secondary">تفريغ</button>
+      </div>
+    </div>
+
+    <div class="flex-split" style="margin-top:12px">
+      <div class="left card" style="padding:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <button id="open_pur_items" class="btn-secondary">قائمة الأصناف</button>
+          <div class="small">اختر صنفًا أو اضغط صف في القائمة ليُنزل تلقائيًا</div>
+        </div>
+        <table>
+          <thead><tr><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><select id="pur_item_select"></select></td>
+              <td><input id="pur_item_unit" disabled style="width:90px"/></td>
+              <td><input id="pur_item_cost" type="number" step="0.01" style="width:120px"/></td>
+              <td><input id="pur_item_qty" type="number" step="1" style="width:100px"/></td>
+              <td><input id="pur_item_total" readonly class="summary-box" style="width:140px"/></td>
+              <td><button id="pur_add_line" class="btn-primary">أضف</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="right card">
+        <h3>بنود الفاتورة</h3>
+        <div class="table-scroll">
+          <table id="pur_lines_table"><thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>الكمية</th><th>الإجمالي</th><th>إجراء</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <div class="small">عدد الأصناف: <span id="pur_lines_count">0</span></div>
+          <div class="small">المجموع: <span id="pur_total">0.00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- صفحات أخرى (قوائم/تقارير/مبيعات) كما في الملف الكبير السابق -->
+  <!-- لأجل الاختصار: باقي الصفحات تبقى كما في المثال السابق (تم تضمينها في النسخة الكاملة) -->
+  <!-- (صفحات مبيعات، قوائم، تقارير) -->
+</div>
+
+<!-- Modal items -->
+<div id="item_modal" class="modal" onclick="if(event.target.id==='item_modal') document.getElementById('item_modal').style.display='none'">
+  <div class="box" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>قائمة الأصناف</h3>
+      <div>
+        <input id="modal_search" placeholder="بحث..." />
+        <button id="modal_close" class="btn-secondary">إغلاق</button>
+      </div>
+    </div>
+    <div class="table-scroll" style="margin-top:8px">
+      <table id="modal_items_table"><thead><tr><th>ID</th><th>الصنف</th><th>الوحدة</th><th>التكلفة</th><th>السعر</th><th>المخزون</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="small" style="margin-top:8px">اضغط على أي صف للاختيار والنزول تلقائياً.</div>
+  </div>
+</div>
+
+<script>
+/*
+  هذا سكربت مُبَسَّط: يُظهر المفاتيح الأساسية فقط للعرض.
+  عند نشر على Vercel تأكد أن index.html في الجذر وستعمل الصفحة مباشرة.
+  إذا تريد أدرج السكربت الكامل (تحكم شامل بالفواتير/المخزون...) أخبرني لأضع النسخة الكبيرة.
+*/
+
+/* سريع: ربط أزرار لمس سريع ليعمل على SUNMI (touchstart + click fallback) */
+(function fastTouchBindings(){
+  let lastTouch = 0
+  function bindFast(el, handler){
+    if(!el) return
+    el.addEventListener('touchstart', function(e){
+      e.preventDefault()
+      lastTouch = Date.now()
+      handler.call(this,e)
+    }, {passive:false})
+    el.addEventListener('click', function(e){
+      if(Date.now() - lastTouch < 700) return
+      handler.call(this,e)
+    })
+  }
+
+  bindFast(document.getElementById('sidebar_toggle_fab'), ()=> document.getElementById('sidebar').classList.toggle('collapsed'))
+  bindFast(document.getElementById('sidebar_close'), ()=> document.getElementById('sidebar').classList.add('collapsed'))
+
+  // side navigation
+  document.querySelectorAll('.sidebtn[data-target]').forEach(btn=>{
+    bindFast(btn, function(){
+      document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'))
+      document.getElementById(this.dataset.target).classList.remove('hidden')
+      document.getElementById('sidebar').classList.add('collapsed')
+      window.scrollTo({top:0,behavior:'smooth'})
+    })
+  })
+
+  // demo: bind add item button to trigger click normally handled by main script
+  bindFast(document.getElementById('addItemBtn'), ()=> document.getElementById('addItemBtn').dispatchEvent(new Event('click')))
+  // bind other primary buttons similarly (if full script added)
+  // e.g. bindFast(document.getElementById('pur_add_line'), ()=> document.getElementById('pur_add_line').dispatchEvent(new Event('click')))
+})()
+
+// NOTE:
+// - هذه الصفحة تحوي بنية HTML/CSS الأساسية وطريقة ربط أزرار اللمس السريع.
+// - إن أردت الملف النهائي الكامل مع كل منطق الفواتير والمخزون (النسخة الطويلة التي أرسلتها سابقًا) سأدرجه بالكامل هنا لتضعه index.html ثم تنشره على Vercel كما في الخطوات.
+</script>
+</body>
+</html>
